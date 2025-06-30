@@ -7,7 +7,7 @@ from pathlib import Path
 
 GITHUB_REPO = "duckdb/duckdb"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs"
-DUCKDB_FILE = Path("ci_metrics.duckdb")
+DUCKDB_FILE = Path("evidence/sources/ci_metrics/ci_metrics.duckdb")
 TABLE_NAME = "ci_runs"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 

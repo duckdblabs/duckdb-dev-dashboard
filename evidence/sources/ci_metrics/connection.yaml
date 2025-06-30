@@ -1,0 +1,5 @@
+# This file was automatically generated
+name: ci_metrics
+type: duckdb
+options:
+  filename: ci_metrics.duckdb
