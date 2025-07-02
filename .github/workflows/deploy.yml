@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  DUCKLAKE_DB_PASSWORD: ${{ secrets.DUCKLAKE_DB_PASSWORD }}
+  DUCKLAKE_HOST: ${{ secrets.DUCKLAKE_HOST }}
+  DUCKLAKE_USER: ${{ secrets.DUCKLAKE_USER }}
+
+jobs:
+  update-ducklake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Update DuckLake
+        run: |
+          python3 -m pip install -r requirements.txt
+          python3 collect_ci_metrics.py
+
+  build:
+    runs-on: ubuntu-latest
+    needs: update-ducklake
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        working-directory: ./evidence
+        run: npm install
+
+      - name: build
+        env:
+          BASE_PATH: '/${{ github.event.repository.name }}'
+        run: |
+          fetch-from-ducklake.sh
+          npm --prefix ./evidence run sources
+          npm --prefix ./evidence run build
+
+      - name: Upload Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'evidence/build/${{ github.event.repository.name }}'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
