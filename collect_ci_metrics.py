@@ -4,34 +4,67 @@ import os
 import requests
 import tempfile
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 GITHUB_REPO = "duckdb/duckdb"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs"
-DUCKDB_FILE = Path("evidence/sources/ci_metrics/ci_metrics.duckdb")
-TABLE_NAME = "ci_runs"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+CI_RUNS_TABLE = "ci_runs"
+
+
+def connect_to_ducklake() -> duckdb.DuckDBPyConnection:
+    con = duckdb.connect()
+    con.execute('INSTALL ducklake')
+    con.execute('INSTALL postgres')
+    con.execute(
+        f"""
+        CREATE OR REPLACE SECRET secret (
+            TYPE s3,
+            PROVIDER config,
+            KEY_ID '{os.getenv("AWS_ACCESS_KEY_ID")}',
+            SECRET '{os.getenv("AWS_SECRET_ACCESS_KEY")}',
+            REGION '{os.getenv("AWS_REGION")}'
+        )
+        """
+    )
+    con.execute(
+        f"""
+        ATTACH 'ducklake:postgres:dbname=ducklake_catalog
+            password={os.getenv("DUCKLAKE_DB_PASSWORD")}
+            host={os.getenv("DUCKLAKE_HOST")}
+            user={os.getenv("DUCKLAKE_USER")}'
+        AS my_ducklake
+        (DATA_PATH 's3://duckdb-ci-dashboard-lake/');
+        """
+    )
+    con.execute("USE my_ducklake")
+    return con
 
 
 def get_latest_previously_stored():
-    with duckdb.connect(DUCKDB_FILE) as con:
-        if con.sql(f"select 1 from duckdb_tables() where table_name = '{TABLE_NAME}'").fetchone():
-            max_id = con.sql(f"SELECT max(id) FROM {TABLE_NAME}").fetchone()[0]
+    with connect_to_ducklake() as con:
+        if con.sql(f"select 1 from duckdb_tables() where table_name = '{CI_RUNS_TABLE}'").fetchone():
+            max_id = con.sql(f"SELECT max(id) FROM {CI_RUNS_TABLE}").fetchone()[0]
             if max_id != None:
                 print(f"latest run previously stored: {max_id}")
                 return max_id
             else:
-                con.execute(f"drop table {TABLE_NAME}")
+                con.execute(f"drop table {CI_RUNS_TABLE}")
     print(f"initial run")
     return 0
 
 
-def fetch_github_actions_runs(latest_previously_stored, INITIAL_RUN):
+def fetch_github_actions_runs(latest_previously_stored, initial_run):
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
     page = 1
     fetched_workflow_runs = []
+    print(f"fetching github workflow runs from: {GITHUB_API_URL}")
     while True:
+        print(f"page: {page}")
         params = {"per_page": 100, "page": page}
         resp = requests.get(GITHUB_API_URL, headers=headers, params=params)
         if resp.status_code != 200:
@@ -43,10 +76,10 @@ def fetch_github_actions_runs(latest_previously_stored, INITIAL_RUN):
             break
         if len(data) < 100:
             break
-        if INITIAL_RUN and page >= 10:
+        if initial_run and page >= 40:
             break
         page += 1
-    print(f"fetched {len(fetched_workflow_runs)} from {GITHUB_API_URL}")
+    print(f"fetched {len(fetched_workflow_runs)} runs")
     return fetched_workflow_runs
 
 
@@ -61,11 +94,11 @@ def store_runs(runs, initial_run, latest_previously_stored):
                     where id < (select min(id) from read_json('{tmp.name}') where status != 'completed')
                     and id > {latest_previously_stored})
                     """
-        with duckdb.connect(DUCKDB_FILE) as con:
+        with connect_to_ducklake() as con:
             if initial_run:
-                con.execute(f"create table ci_runs as {subquery}")
+                con.execute(f"create table {CI_RUNS_TABLE} as {subquery}")
             else:
-                con.execute(f"insert into ci_runs {subquery}")
+                con.execute(f"insert into {CI_RUNS_TABLE} {subquery}")
             print('stored rows:')
             con.sql(f"select id, created_at, html_url, '...' as 'more ...' from {subquery} order by id").show()
 
