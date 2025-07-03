@@ -43,6 +43,7 @@ jobs:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: |
           curl https://install.duckdb.org | sh
+          export PATH='/home/runner/.duckdb/cli/latest':$PATH
           ./fetch-from-ducklake.sh
           npm --prefix ./evidence run sources
           npm --prefix ./evidence run build
