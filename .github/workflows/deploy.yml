@@ -42,6 +42,7 @@ jobs:
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: |
+          curl https://install.duckdb.org | sh
           ./fetch-from-ducklake.sh
           npm --prefix ./evidence run sources
           npm --prefix ./evidence run build
