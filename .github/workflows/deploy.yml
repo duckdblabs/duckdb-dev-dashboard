@@ -42,7 +42,7 @@ jobs:
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: |
-          fetch-from-ducklake.sh
+          ./fetch-from-ducklake.sh
           npm --prefix ./evidence run sources
           npm --prefix ./evidence run build
       - name: Upload Artifacts
