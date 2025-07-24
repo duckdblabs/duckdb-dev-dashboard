@@ -8,16 +8,88 @@ from dotenv import load_dotenv
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils.ducklake import DuckLakeConnection
+from utils.github_utils import get_rate_limit, fetch_github_record_list
 
 load_dotenv()
 
-GITHUB_REPO = "duckdb/duckdb"
-GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs"
+GITHUB_RATE_LIMIT = int(get_rate_limit() * 0.8) # use max 80% of available rate limit
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO = "duckdb/duckdb"
+
+GITHUB_WORKFLOWS_ENDPOINT = f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows"
+GITHUB_RUNS_ENDPOINT = f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs"
+
 CI_RUNS_TABLE = "ci_runs"
+CI_WORKFLOWS_TABLE = "ci_workflows"
 
 
 def main():
+    print(f"github rate limit: {GITHUB_RATE_LIMIT}")
+    update_workflows()
+    update_workflow_runs()
+    update_jobs()
+
+
+def update_workflows():
+    with DuckLakeConnection() as con:
+        if not con.table_exists(CI_WORKFLOWS_TABLE):
+            is_inital_run = True
+        else:
+            if con.table_empty(CI_WORKFLOWS_TABLE):
+                raise ValueError(f"Invalid state - Table {CI_WORKFLOWS_TABLE} should not be empty")
+            is_inital_run = False
+    workflows = fetch_github_actions_workflows()
+    store_workflows(workflows, is_inital_run)
+
+
+def fetch_github_actions_workflows():
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+    page = 1
+    fetched_workflows = []
+    print(f"fetching github workflow runs from: {GITHUB_WORKFLOWS_ENDPOINT}")
+    while True:
+        print(f"page: {page}")
+        params = {"per_page": 100, "page": page}
+        resp = requests.get(GITHUB_WORKFLOWS_ENDPOINT, headers=headers, params=params)
+        if resp.status_code != 200:
+            print(f"GitHub API error: {resp.status_code} {resp.text}")
+            exit(1)
+        data = resp.json().get("workflows", [])
+        fetched_workflows.extend(data)
+        if len(data) < 100:
+            break
+        if page >= GITHUB_RATE_LIMIT:
+            # hitting the rate limit is not likely, since the number of workflows is typically < 100, so one page.
+            raise ValueError("could not fetch all workflows because rate limit is hit")
+        page += 1
+    print(f"fetched {len(fetched_workflows)} workflows")
+    return fetched_workflows
+
+def store_workflows(workflows, is_inital_run):
+    workflows_str = f"[{',\n'.join([json.dumps(w) for w in workflows])}]"
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".json") as tmp:
+        tmp.write(workflows_str)
+        tmp.flush()
+        with DuckLakeConnection() as con:
+            # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
+            if is_inital_run:
+                subquery = f"(select * from read_json('{tmp.name}'))"
+                con.execute(f"create table {CI_WORKFLOWS_TABLE} as {subquery}")
+            else:
+                subquery = f"""
+                            (
+                            select * from read_json('{tmp.name}')
+                            where id not in (select id from {CI_WORKFLOWS_TABLE})
+                            )
+                            """
+                con.execute(f"insert into {CI_WORKFLOWS_TABLE} {subquery}")
+            print('stored rows:')
+            con.sql(f"select * from {subquery} order by id").show()
+
+
+def update_workflow_runs():
     with DuckLakeConnection() as con:
         if not con.table_exists(CI_RUNS_TABLE):
             is_inital_run = True
@@ -29,7 +101,11 @@ def main():
             is_inital_run = False
             latest_previously_stored = con.max_id(CI_RUNS_TABLE)
     runs = fetch_github_actions_runs(is_inital_run, latest_previously_stored)
-    store_runs(runs, False, latest_previously_stored)
+    store_runs(runs, is_inital_run, latest_previously_stored)
+
+
+def update_jobs():
+    pass
 
 
 def fetch_github_actions_runs(initial_run, latest_previously_stored=0):
@@ -38,11 +114,11 @@ def fetch_github_actions_runs(initial_run, latest_previously_stored=0):
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
     page = 1
     fetched_workflow_runs = []
-    print(f"fetching github workflow runs from: {GITHUB_API_URL}")
+    print(f"fetching github workflow runs from: {GITHUB_RUNS_ENDPOINT}")
     while True:
         print(f"page: {page}")
         params = {"per_page": 100, "page": page}
-        resp = requests.get(GITHUB_API_URL, headers=headers, params=params)
+        resp = requests.get(GITHUB_RUNS_ENDPOINT, headers=headers, params=params)
         if resp.status_code != 200:
             print(f"GitHub API error: {resp.status_code} {resp.text}")
             exit(1)
@@ -52,7 +128,7 @@ def fetch_github_actions_runs(initial_run, latest_previously_stored=0):
             break
         if len(data) < 100:
             break
-        if initial_run and page >= 40:
+        if initial_run and page >= GITHUB_RATE_LIMIT:
             break
         page += 1
     print(f"fetched {len(fetched_workflow_runs)} runs")
@@ -67,9 +143,11 @@ def store_runs(runs, initial_run, latest_previously_stored):
         with DuckLakeConnection() as con:
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
             subquery = f"""
-                        (select * from read_json('{tmp.name}')
+                        (
+                        select * from read_json('{tmp.name}')
                         where id < (select min(id) from read_json('{tmp.name}') where status != 'completed')
-                        and id > {latest_previously_stored})
+                        and id > {latest_previously_stored}
+                        )
                         """
             if initial_run:
                 con.execute(f"create table {CI_RUNS_TABLE} as {subquery}")
