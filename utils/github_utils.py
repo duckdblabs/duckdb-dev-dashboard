@@ -1,5 +1,6 @@
 import os
 import requests
+import sys
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
@@ -63,8 +64,9 @@ def fetch_github_record_list(
         params = {"per_page": per_page, "page": page}
         resp = requests.get(url, headers=headers, params=params)
         if resp.status_code != 200:
-            print(f"GitHub API error: {resp.status_code} {resp.text}")
-            exit(1)
+            print(f"fetching from: {url}", file=sys.stderr, flush=True)
+            print(f"GitHub API error: {resp.status_code} {resp.text}", file=sys.stderr, flush=True)
+            return 0, []
         resp_data: dict = resp.json()
         if 'total_count' not in resp_data or main_node not in resp_data:
             print(f"unexpected response keys: {resp_data.keys()};\nexpected: 'total_count' and '{main_node}'")
@@ -102,6 +104,7 @@ def fetch_github_record_list(
             break
         if page - start_page > rate_limit:
             break
+        page += 1
     if detail_log:
         print(f"fetched {len(fetched_records)} from a total of {total_count} records")
     return total_count, fetched_records

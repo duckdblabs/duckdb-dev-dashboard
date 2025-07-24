@@ -56,7 +56,7 @@ def update_workflow_runs():
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
             is_inital_run = False
             latest_previously_stored = con.max_id(GITHUB_RUNS_TABLE)
-    runs = fetch_github_actions_runs(is_inital_run, latest_previously_stored)
+    runs = fetch_github_actions_runs(is_inital_run, rate_limit, latest_previously_stored)
     store_runs(runs, is_inital_run, latest_previously_stored)
 
 
@@ -169,7 +169,8 @@ def fetch_github_actions_runs(initial_run, rate_limit, latest_previously_stored=
         params = {"per_page": 100, "page": page}
         resp = requests.get(GITHUB_RUNS_ENDPOINT, headers=headers, params=params)
         if resp.status_code != 200:
-            print(f"GitHub API error: {resp.status_code} {resp.text}")
+            print(f"fetching from: {GITHUB_RUNS_ENDPOINT}", file=sys.stderr, flush=True)
+            print(f"GitHub API error: {resp.status_code} {resp.text}", file=sys.stderr, flush=True)
             exit(1)
         data = resp.json().get("workflow_runs", [])
         fetched_workflow_runs.extend(data)
