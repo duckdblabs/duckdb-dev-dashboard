@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Update Dashboard
 
 on:
   workflow_dispatch:
@@ -53,6 +53,7 @@ jobs:
           path: 'evidence/build'
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:
