@@ -12,7 +12,7 @@ from utils.github_utils import get_rate_limit, fetch_github_record_list
 
 load_dotenv()
 
-GITHUB_RATE_LIMIT = int(get_rate_limit() * 0.8) # use max 80% of available rate limit
+GITHUB_RATE_LIMIT = int(get_rate_limit() * 0.8)  # use max 80% of available rate limit
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = "duckdb/duckdb"
 
@@ -66,6 +66,7 @@ def fetch_github_actions_workflows():
         page += 1
     print(f"fetched {len(fetched_workflows)} workflows")
     return fetched_workflows
+
 
 def store_workflows(workflows, is_inital_run):
     workflows_str = f"[{',\n'.join([json.dumps(w) for w in workflows])}]"
