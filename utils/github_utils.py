@@ -19,7 +19,9 @@ def get_rate_limit():
     return rate_limit
 
 
-def fetch_github_record_list(url, main_node, reference_id=0, fetch_smaller=False, rate_limit=40, start_page=1):
+def fetch_github_record_list(
+    url, main_node, reference_id=0, fetch_smaller=False, rate_limit=40, start_page=1, detail_log=False
+):
     """
     Fetch records from a github list API
     Requirements the endpoint is assumed to meet:
@@ -53,9 +55,11 @@ def fetch_github_record_list(url, main_node, reference_id=0, fetch_smaller=False
     page = start_page
     per_page = 100  # max value for github api
     total_count = 0
-    print(f"fetching github records from: {url}")
+    if detail_log:
+        print(f"fetching from: {url}")
     while True:
-        print(f"page: {page}")
+        if detail_log:
+            print(f"page: {page}")
         params = {"per_page": per_page, "page": page}
         resp = requests.get(url, headers=headers, params=params)
         if resp.status_code != 200:
@@ -98,5 +102,6 @@ def fetch_github_record_list(url, main_node, reference_id=0, fetch_smaller=False
             break
         if page - start_page > rate_limit:
             break
-    print(f"fetched {len(fetched_records)} from a total of {total_count} records")
+    if detail_log:
+        print(f"fetched {len(fetched_records)} from a total of {total_count} records")
     return total_count, fetched_records
