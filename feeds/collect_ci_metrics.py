@@ -12,7 +12,7 @@ from utils.github_utils import get_rate_limit, fetch_github_record_list
 
 load_dotenv()
 
-GITHUB_RATE_LIMITING_FACTOR = 0.05  # use max 5% of available rate limit for testing purposes
+GITHUB_RATE_LIMITING_FACTOR = 0.8  # use max 80% of available rate limit
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = "duckdb/duckdb"
 
