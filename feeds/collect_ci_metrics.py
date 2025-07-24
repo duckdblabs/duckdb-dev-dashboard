@@ -28,8 +28,8 @@ def main():
                 raise ValueError(f"Invalid state - Table {CI_RUNS_TABLE} should not be empty")
             is_inital_run = False
             latest_previously_stored = con.max_id(CI_RUNS_TABLE)
-        runs = fetch_github_actions_runs(is_inital_run, latest_previously_stored)
-        store_runs(runs, False, latest_previously_stored)
+    runs = fetch_github_actions_runs(is_inital_run, latest_previously_stored)
+    store_runs(runs, False, latest_previously_stored)
 
 
 def fetch_github_actions_runs(initial_run, latest_previously_stored=0):
