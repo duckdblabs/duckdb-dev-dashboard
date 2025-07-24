@@ -67,7 +67,6 @@ def fetch_github_record_list(url, main_node, reference_id=0, fetch_smaller=False
             exit(1)
         if page == start_page:
             total_count = resp_data['total_count']
-            print(f"total_count: {total_count}")
         data = resp_data[main_node]
         if reference_id == 0:
             fetched_records.extend(data)
@@ -99,5 +98,5 @@ def fetch_github_record_list(url, main_node, reference_id=0, fetch_smaller=False
             break
         if page - start_page > rate_limit:
             break
-    print(f"fetched {len(fetched_records)} records")
+    print(f"fetched {len(fetched_records)} from a total of {total_count} records")
     return total_count, fetched_records

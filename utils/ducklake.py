@@ -63,3 +63,8 @@ class DuckLakeConnection:
 
     def max_id(self, table_name: str) -> int | None:
         return self.con.sql(f"select max(id) from {table_name}").fetchone()[0]
+
+
+# # example usage:
+# with DuckLakeConnection() as con:
+#     con.sql('show tables').show()
