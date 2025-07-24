@@ -21,7 +21,7 @@ jobs:
       - name: Update DuckLake
         run: |
           python3 -m pip install -r requirements.txt
-          python3 collect_ci_metrics.py
+          python3 run_feeds.py
 
   build:
     runs-on: ubuntu-latest
