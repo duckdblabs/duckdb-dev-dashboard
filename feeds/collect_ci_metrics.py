@@ -12,7 +12,7 @@ from utils.github_utils import get_rate_limit, fetch_github_record_list
 
 load_dotenv()
 
-GITHUB_RATE_LIMIT = int(get_rate_limit() * 0.01)  # use max 1% of available rate limit for testing purposes
+GITHUB_RATE_LIMITING_FACTOR = 0.05  # use max 5% of available rate limit for testing purposes
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = "duckdb/duckdb"
 
@@ -32,6 +32,7 @@ def main():
 
 
 def update_workflows():
+    rate_limit = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_WORKFLOWS_TABLE):
             is_inital_run = True
@@ -39,16 +40,17 @@ def update_workflows():
             if con.table_empty(GITHUB_WORKFLOWS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_WORKFLOWS_TABLE} should not be empty")
             is_inital_run = False
-    _, workflows = fetch_github_record_list(GITHUB_WORKFLOWS_ENDPOINT, 'workflows', detail_log=True)
+    _, workflows = fetch_github_record_list(GITHUB_WORKFLOWS_ENDPOINT, 'workflows', rate_limit, detail_log=True)
     store_workflows(workflows, is_inital_run)
 
 
 def update_workflow_runs():
+    rate_limit = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_RUNS_TABLE):
             is_inital_run = True
             latest_previously_stored = 0
-            runs = fetch_github_actions_runs(True)
+            runs = fetch_github_actions_runs(True, rate_limit)
         else:
             if con.table_empty(GITHUB_RUNS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
@@ -59,7 +61,7 @@ def update_workflow_runs():
 
 
 def update_run_jobs():
-    max_nr_runs = int(get_rate_limit() * 0.8)
+    max_nr_runs = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
     # first get the run_ids, we need them to fetch the jobs
     with DuckLakeConnection() as con:
         assert con.table_exists(GITHUB_RUNS_TABLE)
@@ -88,7 +90,7 @@ def update_run_jobs():
     for (run_id,) in run_ids:
         print(f"{count}/{total_runs}")
         endpoint = GITHUB_JOBS_ENDPOINT.format(GITHUB_REPO=GITHUB_REPO, RUN_ID=run_id)
-        _, jobs = fetch_github_record_list(endpoint, 'jobs', detail_log=True)
+        _, jobs = fetch_github_record_list(endpoint, 'jobs', max_nr_runs, detail_log=True)
         new_jobs.extend(jobs)
         count = count + 1
     # store in ducklake
@@ -155,7 +157,7 @@ def store_runs(runs, is_initial_run, latest_previously_stored):
             con.sql(f"select id, created_at, html_url, '...' as 'more ...' from {subquery} order by id").show()
 
 
-def fetch_github_actions_runs(initial_run, latest_previously_stored=0):
+def fetch_github_actions_runs(initial_run, rate_limit, latest_previously_stored=0):
     headers = {"Accept": "application/vnd.github+json"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
@@ -175,7 +177,7 @@ def fetch_github_actions_runs(initial_run, latest_previously_stored=0):
             break
         if len(data) < 100:
             break
-        if initial_run and page >= GITHUB_RATE_LIMIT:
+        if initial_run and page >= rate_limit:
             break
         page += 1
     print(f"fetched {len(fetched_workflow_runs)} runs")

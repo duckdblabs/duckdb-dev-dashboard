@@ -13,14 +13,14 @@ def get_rate_limit():
         print(f"GitHub API error: {resp.status_code} {resp.text}")
         exit(1)
     rate_limit = resp.json()['rate']['remaining']
-    if rate_limit == 0 or not isinstance(rate_limit, int):
+    if not isinstance(rate_limit, int):
         print(f"Invalid rate limit: {resp.status_code} {resp.text}")
         exit(1)
     return rate_limit
 
 
 def fetch_github_record_list(
-    url, main_node, reference_id=0, fetch_smaller=False, rate_limit=40, start_page=1, detail_log=False
+    url, main_node, rate_limit, reference_id=0, fetch_smaller=False, start_page=1, detail_log=False
 ):
     """
     Fetch records from a github list API
@@ -34,7 +34,7 @@ def fetch_github_record_list(
         main_node: github api (typically) returns 2 nodes: 'total_count' and a main node that contains the actual records
         reference_id: a reference id that is used to limit the number of records to fetch;
             - value 0 means: fetch all records from endpoint
-            - NOTE: only set when the API resuls are ordered DESC by 'id'
+            - NOTE: only use this argument when the API resuls are ordered DESC by 'id' !!
         fetch_smaller:
             - if True, only include records with ids <= reference_id (i.e. less recent)
             - if False (default), only include records with ids >= reference_id (i.e. more recent)
