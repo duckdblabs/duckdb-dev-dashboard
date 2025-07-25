@@ -55,4 +55,4 @@ Note that only consecutive 'completed' runs are stored.
 After an initial run the script will add new completed runs ('append only').
 
 ## front end:
-see [/evidence/README.md](/evidence/README)
+see [./evidence/README.md](/evidence/README.md)
