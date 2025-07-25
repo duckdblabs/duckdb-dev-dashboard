@@ -10,6 +10,7 @@ class DuckLakeConnection:
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             "AWS_REGION",
+            "DUCKLAKE_S3_BUCKET",
             "DUCKLAKE_DB_PASSWORD",
             "DUCKLAKE_HOST",
             "DUCKLAKE_USER",
@@ -40,7 +41,7 @@ class DuckLakeConnection:
                 host={os.getenv("DUCKLAKE_HOST")}
                 user={os.getenv("DUCKLAKE_USER")}'
             AS my_ducklake
-            (DATA_PATH 's3://duckdb-ci-dashboard-lake/');
+            (DATA_PATH '{os.getenv("DUCKLAKE_S3_BUCKET")}');
             """
         )
         self.con.execute("USE my_ducklake")
@@ -61,7 +62,7 @@ class DuckLakeConnection:
     def table_empty(self, table_name: str) -> bool:
         return self.con.sql(f"select count(*) from {table_name}").fetchone() == (0,)
 
-    def max_id(self, table_name: str) -> int | None:
+    def max_id(self, table_name: str):
         return self.con.sql(f"select max(id) from {table_name}").fetchone()[0]
 
 
