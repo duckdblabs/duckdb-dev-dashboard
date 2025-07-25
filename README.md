@@ -1,11 +1,12 @@
-# CI Dashboard
-This repository contains the code to operate the `duckdb-dev-dashboard`
+# DuckDB Dev Dashboard
+This repository contains the code to operate the `duckdb-dev-dashboard`:
 https://duckdblabs.github.io/duckdb-dev-dashboard
 
 The tech stack:
 - back-end: ducklake, with postgres catalog, and storage on amazon s3
-- front-end: evidence
-- update-logic: Github action (runs 'data feeds')
+- front-end: evidence (https://docs.evidence.dev)
+- hosted: Github Pages
+- updates: periodically via Github actions cron
 
 ## Setup
 
@@ -20,8 +21,9 @@ The tech stack:
     - `DUCKLAKE_USER`
     - `DUCKLAKE_DB_PASSWORD`
 - for convenience and local testing, add the vars mentioned above to an `.env` file (gitignored) and run `./utils/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
+- note that the front end is hosted on GitHub pages: https://docs.evidence.dev/deployment/self-host/github-pages
 
-### Connecting to the ducklake
+### Testing set-up: Connecting to the ducklake
 - to connect to the ducklake with the credentials created above:
 ```sql
 ATTACH 'ducklake:ducklake_secret' AS my_ducklake (READ_ONLY);
@@ -41,18 +43,52 @@ SELECT * FROM ducklake_metadata;
 SELECT * FROM glob('s3://duckdb-ci-dashboard-lake/**/*');
 ```
 
-## data feeds
-Data feeds are scripts that update the ducklake backend, and (typically) run periodically
-Data feed scipts need to be in the `/feeds` directory, and are run by `run_feeds.py` which itself is triggered via the Github actions
+## Adding Dashboards
+Creating a dashboard requires the following steps:
+- create a data feed (python script); this will run periodically and add should create and update the data in the ducklake required for the dashboard
+- define a 'source' in evidence; a subdirectory under `./evidence/sources`
+- define a 'page' in evidence; a markdown file under `./evidence/pages`
 
-### example: `collect_ci_metrics.py`
-Script that fetches and stores completed CI runs from:
+### defining data feeds
+Data feeds are scripts that periodically store data in the ducklake
+- all data feeds are python files under `./feeds/` and will be run by `run_feeds.py` (via `make run_feeds`)
+- the general lay-out of a data feed can be as follows
+```python
+data = my_func_to_fetch_data_from_somewhere()
+
+from utils.ducklake import DuckLakeConnection
+with DuckLakeConnection() as con:
+    con.execute(<<< sql statments to create tables, add records, etc... >>>)
+```
+
+### defining sources
+The evidence front-end (see [./evidence/README.md](/evidence/README.md)) can not directly serve from the ducklake, therefore `.duckdb` files will be created as in-between step.
+This is not ideal, since evidence itself also copies the data to convert the data into parquet.
+Therfore (for now) there are 2 build steps:
+- `make generate_sources`:  converts data in the ducklake into `.duckdb` persistent file
+- `make build`: converts `.duckdb` into `.parquet` and builds the front-end
+
+Steps to define a new source:
+- initial step to create a new source, see: https://docs.evidence.dev/core-concepts/data-sources/duckdb/
+- update `generate_sources.sh` to make sure a `.duckdb` is created in this subdirectory with all data required for the dashboard
+- add one or more `.sql` files to select the data relevant for the dashboard
+
+
+### defining dashboard pages
+Define dashboard pages in `./evidence/pages`.
+- To use the `.sql` files created in previous step, see https://docs.evidence.dev/core-concepts/queries/
+- Bars / Charts and other components, see: https://docs.evidence.dev/core-concepts/components/
+- locally test with `make dev`
+
+## example: ci stats dashboard to monitor CI
+- data feed: `feeds/collect_ci_metrics.py`
+- source: `evidence/sources/ci_metrics/`
+- page: `evidence/pages/ci-stats.md`
+
+The data feed that fetches and stores completed CI runs from:
 - https://api.github.com/repos/duckdb/duckdb/actions/workflows
 - https://api.github.com/repos/duckdb/duckdb/actions/runs
 - https://api.github.com/repos/duckdb/duckdb/actions/runs/{RUN_ID}/jobs
 
 Note that only consecutive 'completed' runs are stored.
 After an initial run the script will add new completed runs ('append only').
-
-## front end:
-see [./evidence/README.md](/evidence/README.md)

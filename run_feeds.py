@@ -3,7 +3,6 @@ from pathlib import Path
 
 
 def run_all_feeds():
-    errors = []
     feeds_dir = Path(__file__).parent / 'feeds'
     for file in feeds_dir.iterdir():
         if file.is_file() and file.suffix == '.py':
@@ -12,7 +11,6 @@ def run_all_feeds():
             print(result.stdout, flush=True)
             if result.stderr or result.returncode != 0:
                 error_str = f"{file.name}:\n{result.stderr}\nreturn code: {result.returncode}"
-                errors.append(error_str)
                 print(f"Error when running {error_str}", flush=True)
 
 

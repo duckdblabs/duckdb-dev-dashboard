@@ -1,3 +1,4 @@
 *.duckdb
 *.wal
 .env
+/evidence/.evidence/customization/.profile.json
