@@ -15,3 +15,17 @@ order by date_trunc('day', created_at);
     x=date
     y=nr_runs
 />
+
+
+### Time it takes for a job to start
+Time in seconds
+
+```sql wait_time
+select * from wait_times;
+```
+
+<BarChart
+    data={wait_time}
+    x=date
+    y=wait_time
+/>
