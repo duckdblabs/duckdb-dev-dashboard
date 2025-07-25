@@ -1,4 +1,11 @@
 # CI Dashboard
+This repository contains the code to operate the `duckdb-dev-dashboard`
+https://duckdblabs.github.io/duckdb-dev-dashboard
+
+The tech stack:
+- back-end: ducklake, with postgres catalog, and storage on amazon s3
+- front-end: evidence
+- update-logic: Github action (runs 'data feeds')
 
 ## Setup
 
@@ -34,11 +41,18 @@ SELECT * FROM ducklake_metadata;
 SELECT * FROM glob('s3://duckdb-ci-dashboard-lake/**/*');
 ```
 
-
 ## data feeds
+Data feeds are scripts that update the ducklake backend, and (typically) run periodically
+Data feed scipts need to be in the `/feeds` directory, and are run by `run_feeds.py` which itself is triggered via the Github actions
 
-### `collect_ci_metrics.py`
-Script that fetches and stores completed CI runs from: https://api.github.com/repos/duckdb/duckdb/actions/runs
+### example: `collect_ci_metrics.py`
+Script that fetches and stores completed CI runs from:
+- https://api.github.com/repos/duckdb/duckdb/actions/workflows
+- https://api.github.com/repos/duckdb/duckdb/actions/runs
+- https://api.github.com/repos/duckdb/duckdb/actions/runs/{RUN_ID}/jobs
 
 Note that only consecutive 'completed' runs are stored.
-After an initial run the script will only add new completed runs ('append only').
+After an initial run the script will add new completed runs ('append only').
+
+## front end:
+see [/evidence/README.md](/evidence/README)
