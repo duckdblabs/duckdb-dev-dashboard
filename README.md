@@ -20,7 +20,7 @@ The tech stack:
     - `DUCKLAKE_HOST`
     - `DUCKLAKE_USER`
     - `DUCKLAKE_DB_PASSWORD`
-- for convenience and local testing, add the vars mentioned above to an `.env` file (gitignored) and run `./utils/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
+- for convenience and local testing, add the vars mentioned above to an `.env` file (gitignored) and run `./scripts/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
 - note that the front end is hosted on GitHub pages: https://docs.evidence.dev/deployment/self-host/github-pages
 
 ### Testing set-up: Connecting to the ducklake
@@ -70,7 +70,7 @@ Therfore (for now) there are 2 build steps:
 
 Steps to define a new source:
 - initial step to create a new source, see: https://docs.evidence.dev/core-concepts/data-sources/duckdb/
-- update `generate_sources.sh` to make sure a `.duckdb` is created in this subdirectory with all data required for the dashboard
+- update `./scripts/generate_sources.sh` to make sure a `.duckdb` is created in this subdirectory with all data required for the dashboard
 - add one or more `.sql` files to select the data relevant for the dashboard
 
 
