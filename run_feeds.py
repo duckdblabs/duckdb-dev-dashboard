@@ -14,15 +14,6 @@ def run_all_feeds():
                 error_str = f"{file.name}:\n{result.stderr}\nreturn code: {result.returncode}"
                 errors.append(error_str)
                 print(f"Error when running {error_str}", flush=True)
-    if errors:
-        print('=====================')
-        print('error summary')
-        print('=====================')
-        for error in errors:
-            print(f"error in file: {error[:150]}")
-            print('-----------')
-        exit(1)
-
 
 if __name__ == "__main__":
     run_all_feeds()
