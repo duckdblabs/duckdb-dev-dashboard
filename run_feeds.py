@@ -15,5 +15,6 @@ def run_all_feeds():
                 errors.append(error_str)
                 print(f"Error when running {error_str}", flush=True)
 
+
 if __name__ == "__main__":
     run_all_feeds()
