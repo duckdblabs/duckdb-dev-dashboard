@@ -2,6 +2,8 @@ name: Update Dashboard
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -11,6 +13,7 @@ env:
   DUCKLAKE_DB_PASSWORD: ${{ secrets.DUCKLAKE_DB_PASSWORD }}
   DUCKLAKE_HOST: ${{ secrets.DUCKLAKE_HOST }}
   DUCKLAKE_USER: ${{ secrets.DUCKLAKE_USER }}
+  DUCKLAKE_S3_BUCKET: ${{ vars.DUCKLAKE_S3_BUCKET }}
 
 jobs:
   update-ducklake:

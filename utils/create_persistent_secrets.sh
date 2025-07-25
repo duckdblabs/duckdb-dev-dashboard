@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-DUCKLAKE_S3_BUCKET="s3://duckdb-ci-dashboard-lake/"
-
 if [ -f .env ]; then
   set -a
   source .env
