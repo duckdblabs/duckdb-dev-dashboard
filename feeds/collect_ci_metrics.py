@@ -40,8 +40,11 @@ def update_workflows():
             if con.table_empty(GITHUB_WORKFLOWS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_WORKFLOWS_TABLE} should not be empty")
             is_inital_run = False
-    _, workflows = fetch_github_record_list(GITHUB_WORKFLOWS_ENDPOINT, 'workflows', rate_limit, detail_log=True)
-    store_workflows(workflows, is_inital_run)
+    _, workflows, error = fetch_github_record_list(GITHUB_WORKFLOWS_ENDPOINT, 'workflows', rate_limit, detail_log=True)
+    if error:
+        print(error, file=sys.stderr, flush=True)
+    else:
+        store_workflows(workflows, is_inital_run)
 
 
 def update_workflow_runs():
@@ -57,21 +60,33 @@ def update_workflow_runs():
             is_inital_run = False
             latest_previously_stored = con.max_id(GITHUB_RUNS_TABLE)
     runs = fetch_github_actions_runs(is_inital_run, rate_limit, latest_previously_stored)
-    store_runs(runs, is_inital_run, latest_previously_stored)
+    if runs:
+        store_runs(runs, is_inital_run, latest_previously_stored)
 
 
 def update_run_jobs():
-    max_nr_runs = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
+    adjusted_rate_limit = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
     # first get the run_ids, we need them to fetch the jobs
     with DuckLakeConnection() as con:
         assert con.table_exists(GITHUB_RUNS_TABLE)
         is_inital_run = True if not con.table_exists(GITHUB_JOBS_TABLE) else False
         if is_inital_run:
             run_ids = con.sql(
-                f"select id from {GITHUB_RUNS_TABLE} where status='completed' order by id ASC limit {max_nr_runs}"
+                f"select id from {GITHUB_RUNS_TABLE} where status='completed' order by id ASC limit {adjusted_rate_limit}"
             ).fetchall()
         else:
             # fetch the runs for which the jobs are still missing
+            total_count_star = con.sql(
+                """
+                SELECT count(*)
+                FROM ci_runs runs
+                LEFT JOIN ci_jobs jobs ON runs.id = jobs.run_id
+                WHERE jobs.run_id is NULL
+                """
+            ).fetchone()[0]
+            print(f"jobs need to be fetched for {total_count_star} runs")
+            if total_count_star > adjusted_rate_limit:
+                print(f"applying rate limit: fetching jobs for {adjusted_rate_limit} runs")
             run_ids = con.sql(
                 f"""
                 SELECT runs.id
@@ -79,7 +94,7 @@ def update_run_jobs():
                 LEFT JOIN ci_jobs jobs ON runs.id = jobs.run_id
                 WHERE jobs.run_id is NULL
                 ORDER BY runs.id ASC
-                LIMIT {max_nr_runs}
+                LIMIT {adjusted_rate_limit}
             """
             ).fetchall()
     # fetch jobs from github
@@ -90,11 +105,15 @@ def update_run_jobs():
     for (run_id,) in run_ids:
         print(f"{count}/{total_runs}")
         endpoint = GITHUB_JOBS_ENDPOINT.format(GITHUB_REPO=GITHUB_REPO, RUN_ID=run_id)
-        _, jobs = fetch_github_record_list(endpoint, 'jobs', max_nr_runs, detail_log=True)
-        new_jobs.extend(jobs)
-        count = count + 1
+        _, jobs, error = fetch_github_record_list(endpoint, 'jobs', adjusted_rate_limit, detail_log=True)
+        if error:
+            print(error, file=sys.stderr, flush=True)
+        else:
+            new_jobs.extend(jobs)
+        count += 1
     # store in ducklake
-    store_run_jobs(new_jobs, is_inital_run)
+    if new_jobs:
+        store_run_jobs(new_jobs, is_inital_run)
 
 
 def store_run_jobs(jobs, is_inital_run):
