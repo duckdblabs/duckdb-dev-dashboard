@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def run_all_feeds():
-    feeds_dir = Path(__file__).parent / 'feeds'
+    feeds_dir = Path(__file__).parent.parent / 'feeds'
     for file in feeds_dir.iterdir():
         if file.is_file() and file.suffix == '.py':
             print(f"Running {file.name}...", flush=True)
