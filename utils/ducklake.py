@@ -1,6 +1,9 @@
+from collections import OrderedDict
 import duckdb
-import os
 from dotenv import load_dotenv
+import json
+import os
+import tempfile
 
 
 class DuckLakeConnection:
@@ -64,6 +67,22 @@ class DuckLakeConnection:
 
     def max_id(self, table_name: str):
         return self.con.sql(f"select max(id) from {table_name}").fetchone()[0]
+
+    def create_table(self, table_name: str, records: list[OrderedDict]):
+        json_str = f"[{',\n'.join([json.dumps(rec) for rec in records])}]"
+        # work-around: use temp-file to utilize the type-sniffer
+        with tempfile.NamedTemporaryFile(mode='w+', suffix=".json") as tmp:
+            tmp.write(json_str)
+            tmp.flush()
+            self.con.execute(f"create table {table_name} as from read_json('{tmp.name}')")
+
+    def append_table(self, table_name: str, records: list[OrderedDict]):
+        json_str = f"[{',\n'.join([json.dumps(rec) for rec in records])}]"
+        # work-around: use temp-file to utilize the type-sniffer
+        with tempfile.NamedTemporaryFile(mode='w+', suffix=".json") as tmp:
+            tmp.write(json_str)
+            tmp.flush()
+            self.con.execute(f"insert into {table_name} from read_json('{tmp.name}')")
 
 
 # # example usage:
