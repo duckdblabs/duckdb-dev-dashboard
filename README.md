@@ -70,7 +70,9 @@ Therfore (for now) there are 2 build steps:
 
 Steps to define a new source:
 - initial step to create a new source, see: https://docs.evidence.dev/core-concepts/data-sources/duckdb/
-- update `./scripts/generate_sources.sh` to make sure a `.duckdb` is created in this subdirectory with all data required for the dashboard
+    - run `make dev` to spawn the front-end
+    - following the steps in the link above will create a subdirectory under `./evidence/sources`
+- update `./scripts/generate_sources.sh` to make sure a `.duckdb` file is created in this subdirectory with all data required for the dashboard
 - add one or more `.sql` files to select the data relevant for the dashboard
 
 

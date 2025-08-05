@@ -1,4 +1,5 @@
 *.duckdb
 *.wal
 .env
+.vscode
 /evidence/.evidence/customization/.profile.json

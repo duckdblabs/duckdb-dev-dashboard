@@ -15,7 +15,7 @@ if [ -z "$DUCKLAKE_USER" ];         then echo "Error: DUCKLAKE_USER is not set."
 if [ -z "$DUCKLAKE_DB_PASSWORD" ];  then echo "Error: DUCKLAKE_DB_PASSWORD is not set."; exit 1; fi
 
 
-duckdb ./evidence/sources/ci_metrics/ci_metrics.duckdb -c "
+duckdb -c "
 INSTALL ducklake;
 INSTALL postgres;
 
@@ -34,7 +34,13 @@ ATTACH 'ducklake:postgres:dbname=ducklake_catalog
     AS my_ducklake
     (DATA_PATH '$DUCKLAKE_S3_BUCKET', READ_ONLY);
 
+ATTACH './evidence/sources/ci_metrics/ci_metrics.duckdb' AS ci_workflows_db;
+USE ci_workflows_db;
 CREATE OR REPLACE TABLE ci_workflows AS FROM my_ducklake.ci_workflows;
 CREATE OR REPLACE TABLE ci_runs AS FROM my_ducklake.ci_runs;
 CREATE OR REPLACE TABLE ci_jobs AS FROM my_ducklake.ci_jobs;
+
+ATTACH './evidence/sources/extension_downloads/extension_downloads.duckdb' AS extension_downloads_db;
+USE extension_downloads_db;
+CREATE OR REPLACE TABLE extension_downloads AS FROM my_ducklake.extension_downloads;
 "
