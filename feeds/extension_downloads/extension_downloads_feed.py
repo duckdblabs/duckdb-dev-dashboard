@@ -13,9 +13,6 @@ S3_BUCKET_DIR = 'download-stats-weekly'
 
 
 def run():
-    print("------------------")
-    print("running extension_dowloads_feed ...")
-
     # fetch periods already stored in ducklake
     with DuckLakeConnection() as con:
         if con.table_exists(EXTENSION_DOWNLOADS_TABLE):

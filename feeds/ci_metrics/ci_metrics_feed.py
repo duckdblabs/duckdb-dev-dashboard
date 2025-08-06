@@ -24,8 +24,6 @@ GITHUB_JOBS_TABLE = "ci_jobs"
 
 
 def run():
-    print("------------------")
-    print("running ci_metrics_feed ...")
     update_workflows()
     update_workflow_runs()
     update_run_jobs()

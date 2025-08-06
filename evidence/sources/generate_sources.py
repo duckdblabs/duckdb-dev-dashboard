@@ -1,6 +1,6 @@
 """
 This script creates .duckdb persistent files by copying tables from the ducklake.
-This is necessary since evidence can not directly use ducklake
+This is necessary since evidence can not directly use ducklake yet, since it is on an old version of duckdb-wasm
 
 run this file via Makefile: 'make generate_sources'
 """
