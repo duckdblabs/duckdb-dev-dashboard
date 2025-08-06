@@ -3,10 +3,8 @@ import os
 import requests
 import sys
 import tempfile
-from pathlib import Path
 from dotenv import load_dotenv
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils.ducklake import DuckLakeConnection
 from utils.github_utils import get_rate_limit, fetch_github_record_list
 
@@ -25,7 +23,9 @@ GITHUB_RUNS_TABLE = "ci_runs"
 GITHUB_JOBS_TABLE = "ci_jobs"
 
 
-def main():
+def run():
+    print("------------------")
+    print("running ci_metrics_feed ...")
     update_workflows()
     update_workflow_runs()
     update_run_jobs()
@@ -205,4 +205,4 @@ def fetch_github_actions_runs(initial_run, rate_limit, latest_previously_stored=
 
 
 if __name__ == "__main__":
-    main()
+    run()

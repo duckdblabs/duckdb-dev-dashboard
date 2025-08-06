@@ -3,10 +3,7 @@ from botocore.exceptions import ClientError
 from collections import OrderedDict
 import json
 import re
-import sys
-from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils.ducklake import DuckLakeConnection
 
 EXTENSION_DOWNLOADS_TABLE = 'extension_downloads'
@@ -15,7 +12,10 @@ S3_BUCKET = 'duckdb-extensions'
 S3_BUCKET_DIR = 'download-stats-weekly'
 
 
-def main():
+def run():
+    print("------------------")
+    print("running extension_dowloads_feed ...")
+
     # fetch periods already stored in ducklake
     with DuckLakeConnection() as con:
         if con.table_exists(EXTENSION_DOWNLOADS_TABLE):
@@ -114,4 +114,4 @@ def get_download_stats_from_file(s3_client, file_path):
 
 
 if __name__ == "__main__":
-    main()
+    run()

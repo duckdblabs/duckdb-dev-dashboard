@@ -51,8 +51,9 @@ Creating a dashboard requires the following steps:
 
 ### defining data feeds
 Data feeds are scripts that periodically store data in the ducklake
-- all data feeds are python files under `./feeds/` and will be run by `run_feeds.py` (via `make run_feeds`)
-- the general lay-out of a data feed can be as follows
+- all data feeds are python packages under `./feeds/` and will be run by `run_feeds.py` (via `make run_feeds`)
+- to add a data feed, add python script (single file package) in a directory under `./feeds/` and update `run_feeds.py`
+- the general lay-out of a data feed can be as follows:
 ```python
 data = my_func_to_fetch_data_from_somewhere()
 
@@ -83,7 +84,7 @@ Define dashboard pages in `./evidence/pages`.
 - locally test with `make dev`
 
 ## example: ci stats dashboard to monitor CI
-- data feed: `feeds/collect_ci_metrics.py`
+- data feed: `feeds/collect_ci_metrics.py` #todo update
 - source: `evidence/sources/ci_metrics/`
 - page: `evidence/pages/ci-stats.md`
 
