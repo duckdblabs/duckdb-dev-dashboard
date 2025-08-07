@@ -4,11 +4,11 @@ all: run_feeds generate_sources build
 
 # run feeds to update the ducklake
 run_feeds:
-	python3 ./scripts/run_feeds.py
+	python3 -m feeds.run_feeds
 
-# generates duckdb files (required by evidence)
+# generates duckdb files from ducklake (required by evidence)
 generate_sources:
-	./scripts/generate_sources.sh
+	python3 -m evidence.sources.generate_sources
 
 # build the front-end
 build:
