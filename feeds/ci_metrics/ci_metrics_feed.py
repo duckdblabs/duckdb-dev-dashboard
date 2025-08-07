@@ -40,7 +40,7 @@ def update_workflows():
             is_inital_run = False
     _, workflows, error = fetch_github_record_list(GITHUB_WORKFLOWS_ENDPOINT, 'workflows', rate_limit, detail_log=True)
     if error:
-        print(error, file=sys.stderr, flush=True)
+        print(error)
     else:
         store_workflows(workflows, is_inital_run)
 
@@ -105,7 +105,7 @@ def update_run_jobs():
         endpoint = GITHUB_JOBS_ENDPOINT.format(GITHUB_REPO=GITHUB_REPO, RUN_ID=run_id)
         _, jobs, error = fetch_github_record_list(endpoint, 'jobs', adjusted_rate_limit, detail_log=True)
         if error:
-            print(error, file=sys.stderr, flush=True)
+            print(error)
         else:
             new_jobs.extend(jobs)
         count += 1
@@ -186,8 +186,8 @@ def fetch_github_actions_runs(initial_run, rate_limit, latest_previously_stored=
         params = {"per_page": 100, "page": page}
         resp = requests.get(GITHUB_RUNS_ENDPOINT, headers=headers, params=params)
         if resp.status_code != 200:
-            print(f"fetching from: {GITHUB_RUNS_ENDPOINT}", file=sys.stderr, flush=True)
-            print(f"GitHub API error: {resp.status_code} {resp.text}", file=sys.stderr, flush=True)
+            print(f"fetching from: {GITHUB_RUNS_ENDPOINT}")
+            print(f"GitHub API error: {resp.status_code} {resp.text}")
             exit(1)
         data = resp.json().get("workflow_runs", [])
         fetched_workflow_runs.extend(data)

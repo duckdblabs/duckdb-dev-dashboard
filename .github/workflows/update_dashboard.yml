@@ -45,7 +45,7 @@ jobs:
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: |
-          curl https://install.duckdb.org | sh
+          python3 -m pip install -r requirements.txt
           export PATH='/home/runner/.duckdb/cli/latest':$PATH
           make generate_sources
           make build
