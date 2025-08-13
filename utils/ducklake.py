@@ -10,10 +10,9 @@ class DuckLakeConnection:
     def __init__(self):
         load_dotenv()
         for env_var in [
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-            "AWS_REGION",
-            "DUCKLAKE_S3_BUCKET",
+            "S3_KEY_ID",
+            "S3_SECRET_KEY",
+            "S3_ENDPOINT",
             "DUCKLAKE_DB_PASSWORD",
             "DUCKLAKE_HOST",
             "DUCKLAKE_USER",
@@ -31,9 +30,8 @@ class DuckLakeConnection:
             CREATE OR REPLACE SECRET secret (
                 TYPE s3,
                 PROVIDER config,
-                KEY_ID '{os.getenv("AWS_ACCESS_KEY_ID")}',
-                SECRET '{os.getenv("AWS_SECRET_ACCESS_KEY")}',
-                REGION '{os.getenv("AWS_REGION")}'
+                KEY_ID '{os.getenv("S3_KEY_ID")}',
+                SECRET '{os.getenv("S3_SECRET_KEY")}'
             )
             """
         )
@@ -44,7 +42,7 @@ class DuckLakeConnection:
                 host={os.getenv("DUCKLAKE_HOST")}
                 user={os.getenv("DUCKLAKE_USER")}'
             AS my_ducklake
-            (DATA_PATH '{os.getenv("DUCKLAKE_S3_BUCKET")}');
+            (DATA_PATH '{os.getenv("S3_ENDPOINT")}');
             """
         )
         self.con.execute("USE my_ducklake")

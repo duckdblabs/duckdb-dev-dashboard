@@ -12,10 +12,9 @@ The tech stack:
 
 ### Create a postgres-s3-ducklake with DuckDB CLI
 - create a new bucket at Amazon S3, to serve as data store for the ducklake. Get the following vars:
-    - `AWS_ACCESS_KEY_ID`
-    - `AWS_SECRET_ACCESS_KEY`
-    - `AWS_REGION`
-    - `DUCKLAKE_S3_BUCKET` (the path of the bucket, e.g. `s3:duckdb-ci-dashboard-lake/`)
+    - `S3_KEY_ID`
+    - `S3_SECRET_KEY`
+    - `S3_ENDPOINT` (the path of the bucket, e.g. `s3:my-bucket/`)
 - create a Postgres server, e.g. at https://neon.com/ to serve as catalog for the ducklake. Get the following vars, (mentioned in the `connection string`):
     - `DUCKLAKE_HOST`
     - `DUCKLAKE_USER`
@@ -40,7 +39,7 @@ SELECT * FROM ducklake_metadata;
 
 - to directly query the data store (with the credentials created above) e.g.:
 ```sql
-SELECT * FROM glob('s3://duckdb-ci-dashboard-lake/**/*');
+SELECT * FROM glob('<--my-s3-endpoint-->/**/*');
 ```
 
 ## Adding Dashboards
