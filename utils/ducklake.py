@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import json
 import os
 import tempfile
+import psycopg2
 
 
 class DuckLakeConnection:
@@ -20,6 +21,8 @@ class DuckLakeConnection:
             if env_var not in os.environ.keys():
                 raise ValueError(f"Env variable '{env_var}' is missing!")
         self.con = None
+        self.catalog_name = 'ducklake_catalog'
+        self._create_catalog_db_if_not_exists()
 
     def __enter__(self):
         self.con = duckdb.connect()
@@ -37,7 +40,7 @@ class DuckLakeConnection:
         )
         self.con.execute(
             f"""
-            ATTACH 'ducklake:postgres:dbname=ducklake_catalog
+            ATTACH 'ducklake:postgres:dbname={self.catalog_name}
                 password={os.getenv("DUCKLAKE_DB_PASSWORD")}
                 host={os.getenv("DUCKLAKE_HOST")}
                 user={os.getenv("DUCKLAKE_USER")}'
@@ -50,6 +53,27 @@ class DuckLakeConnection:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.con.close()
+
+    def _create_catalog_db_if_not_exists(self):
+        # create postgres catalog db (empty)
+        CATALOG_DB_NAME = self.catalog_name
+        con = psycopg2.connect(
+            dbname="postgres",
+            user=os.environ["DUCKLAKE_USER"],
+            host=os.environ["DUCKLAKE_HOST"],
+            password=os.environ["DUCKLAKE_DB_PASSWORD"]
+        )
+        con.autocommit = True
+        try:
+            with con.cursor() as cursor:
+                cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = '{CATALOG_DB_NAME}'")
+                if cursor.fetchone():
+                    print(f"Ducklake catalog database found.")
+                else:
+                    cursor.execute(f"CREATE DATABASE {CATALOG_DB_NAME}")
+                    print(f"Ducklake catalog database created.")
+        finally:
+            con.close()
 
     def sql(self, sql_str):
         return self.con.sql(sql_str)
