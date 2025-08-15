@@ -22,6 +22,8 @@ class DuckLakeConnection:
         ]:
             if env_var not in os.environ.keys():
                 raise ValueError(f"Env variable '{env_var}' is missing!")
+            if os.getenv(env_var) == "":
+                raise ValueError(f"Env variable '{env_var}' is empty!")
         self.con = None
         self.catalog_name = 'ducklake_catalog'
         if storage_type and storage_type not in ['s3', 'r2']:
@@ -78,6 +80,7 @@ class DuckLakeConnection:
             print("http_endpoint ok", flush=True)
         else:
             print("http_endpoint not ok", flush=True)
+            print(f"{len(http_endpoint)} - {http_endpoint[:10]}", flush=True)
             raise ValueError(f"invalid http_endpoint")
         ## debug 1 - end
 
@@ -90,7 +93,8 @@ class DuckLakeConnection:
             print("r2_endpoint ok", flush=True)
         else:
             print("r2_endpoint not ok", flush=True)
-            raise ValueError(f"invalid http_endpoint")
+            print(f"{len(return_endpoint)} - {return_endpoint[:10]}", flush=True)
+            raise ValueError(f"invalid r2 endpoint")
         ## debug 2 - end
 
         return f"r2://{bucket_path}/"
@@ -135,7 +139,7 @@ class DuckLakeConnection:
             print("creating secrets for r2...", flush=True)
             if 'R2_ACCOUNT_ID' not in os.environ.keys():
                 raise ValueError(f"Env variable 'R2_ACCOUNT_ID' is missing!")
-            if (len(os.getenv("R2_ACCOUNT_ID")) != 32):
+            if len(os.getenv("R2_ACCOUNT_ID")) != 32:
                 print(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 32)!", flush=True)
                 raise ValueError(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 32)!")
             print("running sql...", flush=True)
