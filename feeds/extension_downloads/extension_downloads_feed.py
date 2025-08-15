@@ -3,6 +3,8 @@ from botocore.exceptions import ClientError
 from collections import OrderedDict
 import json
 import re
+import os
+from dotenv import load_dotenv
 
 from utils.ducklake import DuckLakeConnection
 
@@ -13,6 +15,29 @@ S3_BUCKET_DIR = 'download-stats-weekly'
 
 
 def run():
+    if env_valid():
+        run_feed()
+    else:
+        print(f"WARNING: missing credentials; SKIPPING datafeed '{__name__}'", flush=True)
+
+
+def env_valid():
+    valid = True
+    for env_var in [
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION"
+    ]:
+        if env_var not in os.environ.keys():
+            print(f"Env variable '{env_var}' is missing!")
+            valid = False
+        elif os.getenv(env_var) == "":
+            print(f"Env variable '{env_var}' is empty!")
+            valid = False
+    return valid
+
+
+def run_feed():
     # fetch periods already stored in ducklake
     with DuckLakeConnection() as con:
         if con.table_exists(EXTENSION_DOWNLOADS_TABLE):

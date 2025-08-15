@@ -14,7 +14,7 @@ The tech stack:
 - create a new bucket at Amazon S3, to serve as data store for the ducklake. Get the following vars:
     - `S3_KEY_ID`
     - `S3_SECRET_KEY`
-    - `S3_ENDPOINT` (the path of the bucket, e.g. `s3:my-bucket/`)
+    - `S3_ENDPOINT` (the path of the bucket, e.g. `s3://my-bucket/` OR `r2://my-bucket/`)
 - create a Postgres server, e.g. at https://neon.com/ to serve as catalog for the ducklake. Get the following vars, (mentioned in the `connection string`):
     - `DUCKLAKE_HOST`
     - `DUCKLAKE_USER`
@@ -39,7 +39,13 @@ SELECT * FROM ducklake_metadata;
 
 - to directly query the data store (with the credentials created above) e.g.:
 ```sql
+-- for s3 buckets
+SELECT * FROM glob('s3://my-s3-bucket/**/*');
+-- or:
 SELECT * FROM glob('<--my-s3-endpoint-->/**/*');
+
+-- for r2 buckets
+SELECT * FROM glob('r2://my-r2-bucket/**/*');
 ```
 
 ## Adding Dashboards
