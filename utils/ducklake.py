@@ -5,10 +5,11 @@ import json
 import os
 import tempfile
 import psycopg2
+from urllib.parse import urlparse
 
 
 class DuckLakeConnection:
-    def __init__(self):
+    def __init__(self, storage_type = ""):
         load_dotenv()
         for env_var in [
             "S3_KEY_ID",
@@ -22,22 +23,27 @@ class DuckLakeConnection:
                 raise ValueError(f"Env variable '{env_var}' is missing!")
         self.con = None
         self.catalog_name = 'ducklake_catalog'
+        if storage_type and storage_type not in ['s3', 'r2']:
+            raise ValueError(f"Invalid storage_type: '{storage_type}', should be 's3' or 'r2'")
+        if storage_type == "":
+            if (os.getenv("S3_ENDPOINT").startswith('s3')):
+                self.storage_type = 's3'
+            else:
+                self.storage_type = 'r2'
+        else:
+            self.storage_type = storage_type
+        if (self.storage_type == 'r2'):
+            self.storage_endpoint = self._convert_r2_endpoint(os.getenv("S3_ENDPOINT"))
+        else:
+            self.storage_endpoint = os.getenv("S3_ENDPOINT")
         self._create_catalog_db_if_not_exists()
 
     def __enter__(self):
         self.con = duckdb.connect()
         self.con.execute('INSTALL ducklake; LOAD ducklake;')
         self.con.execute('INSTALL postgres; LOAD postgres;')
-        self.con.execute(
-            f"""
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER config,
-                KEY_ID '{os.getenv("S3_KEY_ID")}',
-                SECRET '{os.getenv("S3_SECRET_KEY")}'
-            )
-            """
-        )
+        self.con.execute('INSTALL httpfs; LOAD httpfs;')
+        self._create_storage_secret()
         self.con.execute(
             f"""
             ATTACH 'ducklake:postgres:dbname={self.catalog_name}
@@ -45,7 +51,7 @@ class DuckLakeConnection:
                 host={os.getenv("DUCKLAKE_HOST")}
                 user={os.getenv("DUCKLAKE_USER")}'
             AS my_ducklake
-            (DATA_PATH '{os.getenv("S3_ENDPOINT")}');
+            (DATA_PATH '{self.storage_endpoint}');
             """
         )
         self.con.execute("USE my_ducklake")
@@ -53,6 +59,16 @@ class DuckLakeConnection:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.con.close()
+
+    def _convert_r2_endpoint(http_endpoint: str) -> str:
+        # Convert an endpoint URL like:
+        #   https://example.com/my-bucket/
+        # into:
+        #   r2://my-bucket/
+        # this is needed because: "R2 secrets are only available when using URLs starting with r2://"
+        # see: https://duckdb.org/docs/stable/core_extensions/httpfs/s3api#r2-secrets
+        bucket_path = urlparse(http_endpoint).path.strip("/")
+        return f"r2://{bucket_path}/"
 
     def _create_catalog_db_if_not_exists(self):
         # create postgres catalog db (empty)
@@ -74,6 +90,37 @@ class DuckLakeConnection:
                     print(f"Ducklake catalog database created.")
         finally:
             con.close()
+
+    def _create_storage_secret(self):
+        if (self.storage_type == 's3'):
+            s3_region = os.getenv("AWS_REGION")
+            self.con.execute(
+                f"""
+                CREATE OR REPLACE SECRET s3_secret (
+                    TYPE s3,
+                    PROVIDER config,
+                    KEY_ID '{os.getenv("S3_KEY_ID")}',
+                    SECRET '{os.getenv("S3_SECRET_KEY")}'
+                    {f", REGION '{s3_region}'" if s3_region else ''}
+                )
+                """
+            )
+        elif (self.storage_type == 'r2'):
+            if 'R2_ACCOUNT_ID' not in os.environ.keys():
+                raise ValueError(f"Env variable 'R2_ACCOUNT_ID' is missing!")
+            self.con.execute(
+                f"""
+                CREATE OR REPLACE SECRET r2_secret (
+                    TYPE r2,
+                    PROVIDER config,
+                    KEY_ID '{os.getenv("S3_KEY_ID")}',
+                    SECRET '{os.getenv("S3_SECRET_KEY")}',
+                    ACCOUNT_ID '{os.getenv("R2_ACCOUNT_ID")}'
+                )
+                """
+            )
+        else:
+            raise ValueError(f"Unsupported storage_type: '{self.storage_type}, should be 'r2' or 's3'")
 
     def sql(self, sql_str):
         return self.con.sql(sql_str)
@@ -107,6 +154,6 @@ class DuckLakeConnection:
             self.con.execute(f"insert into {table_name} from read_json('{tmp.name}')")
 
 
-# # example usage:
+# example usage:
 # with DuckLakeConnection() as con:
 #     con.sql('show tables').show()
