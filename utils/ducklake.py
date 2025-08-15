@@ -135,9 +135,9 @@ class DuckLakeConnection:
             print("creating secrets for r2...", flush=True)
             if 'R2_ACCOUNT_ID' not in os.environ.keys():
                 raise ValueError(f"Env variable 'R2_ACCOUNT_ID' is missing!")
-            if (len(os.getenv("R2_ACCOUNT_ID")) != 33):
-                print(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 33)!", flush=True)
-                raise ValueError(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 33)!")
+            if (len(os.getenv("R2_ACCOUNT_ID")) != 32):
+                print(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 32)!", flush=True)
+                raise ValueError(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 32)!")
             print("running sql...", flush=True)
             self.con.execute(
                 f"""
