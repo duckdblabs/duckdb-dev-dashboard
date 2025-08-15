@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 
 class DuckLakeConnection:
-    def __init__(self, storage_type = ""):
+    def __init__(self, storage_type=""):
         load_dotenv()
         for env_var in [
             "S3_KEY_ID",
@@ -26,13 +26,13 @@ class DuckLakeConnection:
         if storage_type and storage_type not in ['s3', 'r2']:
             raise ValueError(f"Invalid storage_type: '{storage_type}', should be 's3' or 'r2'")
         if storage_type == "":
-            if (os.getenv("S3_ENDPOINT").startswith('s3')):
+            if os.getenv("S3_ENDPOINT").startswith('s3'):
                 self.storage_type = 's3'
             else:
                 self.storage_type = 'r2'
         else:
             self.storage_type = storage_type
-        if (self.storage_type == 'r2'):
+        if self.storage_type == 'r2':
             self.storage_endpoint = self._convert_r2_endpoint(os.getenv("S3_ENDPOINT"))
         else:
             self.storage_endpoint = os.getenv("S3_ENDPOINT")
@@ -60,7 +60,7 @@ class DuckLakeConnection:
     def __exit__(self, exc_type, exc_value, traceback):
         self.con.close()
 
-    def _convert_r2_endpoint(http_endpoint: str) -> str:
+    def _convert_r2_endpoint(self, http_endpoint: str) -> str:
         # Convert an endpoint URL like:
         #   https://example.com/my-bucket/
         # into:
@@ -77,7 +77,7 @@ class DuckLakeConnection:
             dbname="postgres",
             user=os.environ["DUCKLAKE_USER"],
             host=os.environ["DUCKLAKE_HOST"],
-            password=os.environ["DUCKLAKE_DB_PASSWORD"]
+            password=os.environ["DUCKLAKE_DB_PASSWORD"],
         )
         con.autocommit = True
         try:
@@ -92,7 +92,7 @@ class DuckLakeConnection:
             con.close()
 
     def _create_storage_secret(self):
-        if (self.storage_type == 's3'):
+        if self.storage_type == 's3':
             s3_region = os.getenv("AWS_REGION")
             self.con.execute(
                 f"""
@@ -105,7 +105,7 @@ class DuckLakeConnection:
                 )
                 """
             )
-        elif (self.storage_type == 'r2'):
+        elif self.storage_type == 'r2':
             if 'R2_ACCOUNT_ID' not in os.environ.keys():
                 raise ValueError(f"Env variable 'R2_ACCOUNT_ID' is missing!")
             self.con.execute(
