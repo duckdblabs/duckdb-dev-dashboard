@@ -61,7 +61,7 @@ def fetch_github_record_list(
         print(f"fetching from: {url}")
     while True:
         if detail_log and page > 1:
-            print(f"page: {page}")
+            print(f"page: {page}", flush=True)
         params = {"per_page": per_page, "page": page}
         resp = requests.get(url, headers=headers, params=params)
         if resp.status_code != 200:
