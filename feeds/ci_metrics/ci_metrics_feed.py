@@ -32,7 +32,6 @@ def run():
 def update_workflows():
     rate_limit = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
     with DuckLakeConnection() as con:
-        print("using DuckLakeConnection...", flush=True)
         if not con.table_exists(GITHUB_WORKFLOWS_TABLE):
             is_inital_run = True
         else:

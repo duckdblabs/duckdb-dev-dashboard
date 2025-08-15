@@ -60,7 +60,7 @@ def fetch_github_record_list(
     if detail_log:
         print(f"fetching from: {url}")
     while True:
-        if detail_log:
+        if detail_log and page > 1:
             print(f"page: {page}")
         params = {"per_page": per_page, "page": page}
         resp = requests.get(url, headers=headers, params=params)

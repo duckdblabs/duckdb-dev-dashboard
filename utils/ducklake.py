@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 class DuckLakeConnection:
     def __init__(self, storage_type=""):
-        print("initializing DuckLakeConnection class...", flush=True)
         load_dotenv()
         for env_var in [
             "S3_KEY_ID",
@@ -40,7 +39,6 @@ class DuckLakeConnection:
         else:
             self.storage_endpoint = os.getenv("S3_ENDPOINT")
         self._create_catalog_db_if_not_exists()
-        print("done", flush=True)
 
     def __enter__(self):
         self.con = duckdb.connect()
@@ -48,7 +46,6 @@ class DuckLakeConnection:
         self.con.execute('INSTALL postgres; LOAD postgres;')
         self.con.execute('INSTALL httpfs; LOAD httpfs;')
         self._create_storage_secret()
-        print("attaching DuckLake...", flush=True)
         self.con.execute(
             f"""
             ATTACH 'ducklake:postgres:dbname={self.catalog_name}
@@ -59,7 +56,6 @@ class DuckLakeConnection:
             (DATA_PATH '{self.storage_endpoint}');
             """
         )
-        print("done", flush=True)
         self.con.execute("USE my_ducklake")
         return self
 
@@ -73,30 +69,7 @@ class DuckLakeConnection:
         #   r2://my-bucket/
         # this is needed because: "R2 secrets are only available when using URLs starting with r2://"
         # see: https://duckdb.org/docs/stable/core_extensions/httpfs/s3api#r2-secrets
-
-        ## debug 1 - start
-        parsed = urlparse(http_endpoint)
-        if parsed.scheme in ("http", "https") and bool(parsed.netloc):
-            print("http_endpoint ok", flush=True)
-        else:
-            print("http_endpoint not ok", flush=True)
-            print(f"{len(http_endpoint)} - {http_endpoint[:10]}", flush=True)
-            raise ValueError(f"invalid http_endpoint")
-        ## debug 1 - end
-
         bucket_path = urlparse(http_endpoint).path.strip("/")
-
-        ## debug 2 - start
-        return_endpoint = f"r2://{bucket_path}/"
-        parsed = urlparse(return_endpoint)
-        if parsed.scheme == "r2" and bool(parsed.netloc):
-            print("r2_endpoint ok", flush=True)
-        else:
-            print("r2_endpoint not ok", flush=True)
-            print(f"{len(return_endpoint)} - {return_endpoint[:10]}", flush=True)
-            raise ValueError(f"invalid r2 endpoint")
-        ## debug 2 - end
-
         return f"r2://{bucket_path}/"
 
     def _create_catalog_db_if_not_exists(self):
@@ -112,16 +85,13 @@ class DuckLakeConnection:
         try:
             with con.cursor() as cursor:
                 cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = '{CATALOG_DB_NAME}'")
-                if cursor.fetchone():
-                    print(f"Ducklake catalog database found.")
-                else:
+                if not cursor.fetchone():
                     cursor.execute(f"CREATE DATABASE {CATALOG_DB_NAME}")
                     print(f"Ducklake catalog database created.")
         finally:
             con.close()
 
     def _create_storage_secret(self):
-        print("creating secrets...", flush=True)
         if self.storage_type == 's3':
             s3_region = os.getenv("AWS_REGION")
             self.con.execute(
@@ -136,13 +106,11 @@ class DuckLakeConnection:
                 """
             )
         elif self.storage_type == 'r2':
-            print("creating secrets for r2...", flush=True)
             if 'R2_ACCOUNT_ID' not in os.environ.keys():
                 raise ValueError(f"Env variable 'R2_ACCOUNT_ID' is missing!")
             if len(os.getenv("R2_ACCOUNT_ID")) != 32:
                 print(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 32)!", flush=True)
                 raise ValueError(f"R2_ACCOUNT_ID has length: {len(os.getenv("R2_ACCOUNT_ID"))} (should be 32)!")
-            print("running sql...", flush=True)
             self.con.execute(
                 f"""
                 CREATE OR REPLACE SECRET r2_secret (
@@ -154,7 +122,6 @@ class DuckLakeConnection:
                 )
                 """
             )
-            print("done", flush=True)
         else:
             raise ValueError(f"Unsupported storage_type: '{self.storage_type}, should be 'r2' or 's3'")
 
