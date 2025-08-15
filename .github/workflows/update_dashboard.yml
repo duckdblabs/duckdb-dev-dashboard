@@ -10,6 +10,7 @@ env:
   S3_KEY_ID: ${{ secrets.S3_KEY_ID }}
   S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
   S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
   DUCKLAKE_DB_PASSWORD: ${{ secrets.DUCKLAKE_DB_PASSWORD }}
   DUCKLAKE_HOST: ${{ secrets.DUCKLAKE_HOST }}
   DUCKLAKE_USER: ${{ secrets.DUCKLAKE_USER }}
