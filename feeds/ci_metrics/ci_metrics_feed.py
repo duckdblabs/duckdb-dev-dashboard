@@ -52,7 +52,6 @@ def update_workflow_runs():
         if not con.table_exists(GITHUB_RUNS_TABLE):
             is_inital_run = True
             latest_previously_stored = 0
-            runs = fetch_github_actions_runs(True, rate_limit)
         else:
             if con.table_empty(GITHUB_RUNS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
