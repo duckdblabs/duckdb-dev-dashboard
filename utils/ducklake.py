@@ -33,7 +33,7 @@ class DuckLakeConnection:
                 self.storage_type = 'r2'
         else:
             self.storage_type = storage_type
-        if self.storage_type == 'r2':
+        if self.storage_type == 'r2' and not os.getenv("S3_ENDPOINT").startswith("r2://"):
             self.storage_endpoint = self._convert_r2_endpoint(os.getenv("S3_ENDPOINT"))
         else:
             self.storage_endpoint = os.getenv("S3_ENDPOINT")
