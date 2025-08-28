@@ -24,7 +24,8 @@ class DuckLakeConnection:
             if os.getenv(env_var) == "":
                 raise ValueError(f"Env variable '{env_var}' is empty!")
         self.con = None
-        self.catalog_name = 'ducklake_catalog'
+        self.catalog_db_name = 'ducklake_catalog'
+        self.ducklake_db_alias = 'my_ducklake'
         if storage_type and storage_type not in ['s3', 'r2']:
             raise ValueError(f"Invalid storage_type: '{storage_type}', should be 's3' or 'r2'")
         if storage_type == "":
@@ -39,7 +40,6 @@ class DuckLakeConnection:
             self.storage_endpoint = self._convert_r2_endpoint(os.getenv("S3_ENDPOINT"))
         else:
             self.storage_endpoint = os.getenv("S3_ENDPOINT")
-        print(f"storage_endpoint lenth = '{len(self.storage_endpoint)}'", flush=True)
         self._create_catalog_db_if_not_exists()
 
     def __enter__(self):
@@ -50,15 +50,15 @@ class DuckLakeConnection:
         self._create_storage_secret()
         self.con.execute(
             f"""
-            ATTACH 'ducklake:postgres:dbname={self.catalog_name}
+            ATTACH 'ducklake:postgres:dbname={self.catalog_db_name}
                 password={os.getenv("DUCKLAKE_DB_PASSWORD")}
                 host={os.getenv("DUCKLAKE_HOST")}
                 user={os.getenv("DUCKLAKE_USER")}'
-            AS my_ducklake
+            AS {self.ducklake_db_alias}
             (DATA_PATH '{self.storage_endpoint}');
             """
         )
-        self.con.execute("USE my_ducklake")
+        self.con.execute(f"USE {self.ducklake_db_alias}")
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -71,13 +71,12 @@ class DuckLakeConnection:
         #   r2://my-bucket/
         # this is needed because: "R2 secrets are only available when using URLs starting with r2://"
         # see: https://duckdb.org/docs/stable/core_extensions/httpfs/s3api#r2-secrets
-        print(f"converting endpoint: original lenth = '{len(http_endpoint)}'")
         bucket_path = urlparse(http_endpoint).path.strip("/")
         return f"r2://{bucket_path}/"
 
     def _create_catalog_db_if_not_exists(self):
         # create postgres catalog db (empty)
-        CATALOG_DB_NAME = self.catalog_name
+        CATALOG_DB_NAME = self.catalog_db_name
         con = psycopg2.connect(
             dbname="postgres",
             user=os.environ["DUCKLAKE_USER"],
@@ -135,7 +134,7 @@ class DuckLakeConnection:
         return self.con.execute(sql_str)
 
     def table_exists(self, table_name: str) -> bool:
-        return self.con.sql(f"select 1 from duckdb_tables() where table_name='{table_name}'").fetchone() == (1,)
+        return self.con.sql(f"select 1 from duckdb_tables() where table_name='{table_name}' and database_name='{self.ducklake_db_alias}'").fetchone() == (1,)
 
     def table_empty(self, table_name: str) -> bool:
         return self.con.sql(f"select count(*) from {table_name}").fetchone() == (0,)
