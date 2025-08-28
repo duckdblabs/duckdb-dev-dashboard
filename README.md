@@ -3,7 +3,7 @@ This repository contains the code to operate the `duckdb-dev-dashboard`:
 https://duckdblabs.github.io/duckdb-dev-dashboard
 
 The tech stack:
-- back-end: ducklake, with postgres catalog, and storage on amazon s3
+- back-end: ducklake, with postgres catalog, and storage on amazon s3 (or equivalent like cloudflare R2)
 - front-end: evidence (https://docs.evidence.dev)
 - hosted: Github Pages
 - updates: periodically via Github actions cron
@@ -11,15 +11,17 @@ The tech stack:
 ## Setup
 
 ### Create a postgres-s3-ducklake with DuckDB CLI
-- create a new bucket at Amazon S3, to serve as data store for the ducklake. Get the following vars:
+- create a new bucket at Amazon S3 (or Cloudflare R2), to serve as data store for the ducklake. Get the following vars:
     - `S3_KEY_ID`
     - `S3_SECRET_KEY`
     - `S3_ENDPOINT` (the path of the bucket, e.g. `s3://my-bucket/` OR `r2://my-bucket/`)
+    - `AWS_REGION` (only for Amazon S3)
+    - `R2_ACCOUNT_ID` (only for CloudFlare R2)
 - create a Postgres server, e.g. at https://neon.com/ to serve as catalog for the ducklake. Get the following vars, (mentioned in the `connection string`):
     - `DUCKLAKE_HOST`
     - `DUCKLAKE_USER`
     - `DUCKLAKE_DB_PASSWORD`
-- for convenience and local testing, add the vars mentioned above to an `.env` file (gitignored) and run `./scripts/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
+- for convenience and local testing, add the vars mentioned above to a `.env` file (gitignored) and run `./scripts/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
 - note that the front end is hosted on GitHub pages: https://docs.evidence.dev/deployment/self-host/github-pages
 
 ### Testing set-up: Connecting to the ducklake
