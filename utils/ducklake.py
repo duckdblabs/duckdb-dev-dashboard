@@ -34,10 +34,12 @@ class DuckLakeConnection:
                 self.storage_type = 'r2'
         else:
             self.storage_type = storage_type
+        print(f"initializing ducklake connection with storage type: '{self.storage_type}'", flush=True)
         if self.storage_type == 'r2' and not os.getenv("S3_ENDPOINT").startswith("r2://"):
             self.storage_endpoint = self._convert_r2_endpoint(os.getenv("S3_ENDPOINT"))
         else:
             self.storage_endpoint = os.getenv("S3_ENDPOINT")
+        print(f"storage_endpoint lenth = '{len(self.storage_endpoint)}'", flush=True)
         self._create_catalog_db_if_not_exists()
 
     def __enter__(self):
@@ -69,6 +71,7 @@ class DuckLakeConnection:
         #   r2://my-bucket/
         # this is needed because: "R2 secrets are only available when using URLs starting with r2://"
         # see: https://duckdb.org/docs/stable/core_extensions/httpfs/s3api#r2-secrets
+        print(f"converting endpoint: original lenth = '{len(http_endpoint)}'")
         bucket_path = urlparse(http_endpoint).path.strip("/")
         return f"r2://{bucket_path}/"
 
