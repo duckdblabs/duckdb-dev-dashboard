@@ -8,6 +8,7 @@ secrets:
 
 # run feeds to update the ducklake
 run_feeds:
+	python3 -m utils.verify_catalog
 	python3 -m feeds.run_feeds
 
 # generates duckdb files from ducklake (required by evidence)
