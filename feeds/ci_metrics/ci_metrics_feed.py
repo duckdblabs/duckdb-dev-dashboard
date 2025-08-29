@@ -47,6 +47,8 @@ def update_workflows():
 
 def update_workflow_runs():
     rate_limit = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
+    if rate_limit > 20:
+        rate_limit = 20
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_RUNS_TABLE):
             is_inital_run = True
@@ -56,6 +58,7 @@ def update_workflow_runs():
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
             is_inital_run = False
             latest_previously_stored = con.max_id(GITHUB_RUNS_TABLE)
+        print(f"latest_previously_stored workflow run id: {latest_previously_stored}", flush=True)
     runs = fetch_github_actions_runs(is_inital_run, rate_limit, latest_previously_stored)
     if runs:
         store_runs(runs, is_inital_run, latest_previously_stored)
