@@ -32,8 +32,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Update DuckLake
         run: |
-          python3 -m pip install -r requirements.txt
+          curl https://install.duckdb.org | sh
           ./scripts/create_ducklake_secrets.sh
+          python3 -m pip install -r requirements.txt
           make run_feeds
 
   build:
