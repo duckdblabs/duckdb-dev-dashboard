@@ -102,8 +102,9 @@ class DuckLakeConnection:
                     TYPE s3,
                     PROVIDER config,
                     KEY_ID '{os.getenv("S3_KEY_ID")}',
-                    SECRET '{os.getenv("S3_SECRET_KEY")}'
-                    {f", REGION '{s3_region}'" if s3_region else ''}
+                    SECRET '{os.getenv("S3_SECRET_KEY")}',
+                    {f"REGION '{s3_region}'," if s3_region else ''}
+                    SCOPE '{self.storage_endpoint}'
                 )
                 """
             )
@@ -120,7 +121,8 @@ class DuckLakeConnection:
                     PROVIDER config,
                     KEY_ID '{os.getenv("S3_KEY_ID")}',
                     SECRET '{os.getenv("S3_SECRET_KEY")}',
-                    ACCOUNT_ID '{os.getenv("R2_ACCOUNT_ID")}'
+                    ACCOUNT_ID '{os.getenv("R2_ACCOUNT_ID")}',
+                    SCOPE '{self.storage_endpoint}'
                 )
                 """
             )
