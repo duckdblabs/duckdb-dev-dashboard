@@ -111,6 +111,10 @@ def update_run_jobs():
         else:
             new_jobs.extend(jobs)
         count += 1
+        # debug: limit 20
+        if count > 20:
+            print("debug: stopping at 20")
+            break
     # store in ducklake
     if new_jobs:
         store_run_jobs(new_jobs, is_inital_run)
