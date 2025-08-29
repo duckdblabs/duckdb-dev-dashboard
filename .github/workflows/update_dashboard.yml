@@ -33,6 +33,7 @@ jobs:
       - name: Update DuckLake
         run: |
           python3 -m pip install -r requirements.txt
+          ./scripts/create_ducklake_secrets.sh
           make run_feeds
 
   build:
