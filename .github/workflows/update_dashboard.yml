@@ -33,6 +33,7 @@ jobs:
       - name: Update DuckLake
         run: |
           curl https://install.duckdb.org | sh
+          export PATH='/home/runner/.duckdb/cli/latest':$PATH
           ./scripts/create_ducklake_secrets.sh
           python3 -m pip install -r requirements.txt
           make run_feeds
