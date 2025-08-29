@@ -122,6 +122,7 @@ class DuckLakeConnection:
                     KEY_ID '{os.getenv("S3_KEY_ID")}',
                     SECRET '{os.getenv("S3_SECRET_KEY")}',
                     ACCOUNT_ID '{os.getenv("R2_ACCOUNT_ID")}',
+                    REGION 'auto',
                     SCOPE '{self.storage_endpoint}'
                 )
                 """
