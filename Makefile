@@ -1,6 +1,10 @@
-.PHONY: all run_feeds generate_sources build dev
+.PHONY: all secrets run_feeds generate_sources build dev
 
 all: run_feeds generate_sources build
+
+# create persistent ducklake secrets
+secrets:
+	python3 -m utils.create_ducklake_secrets
 
 # run feeds to update the ducklake
 run_feeds:
