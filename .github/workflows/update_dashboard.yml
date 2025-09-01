@@ -33,6 +33,7 @@ jobs:
       - name: Update DuckLake
         run: |
           python3 -m pip install -r requirements.txt
+          make secrets
           make run_feeds
 
   build:
@@ -55,7 +56,7 @@ jobs:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: |
           python3 -m pip install -r requirements.txt
-          export PATH='/home/runner/.duckdb/cli/latest':$PATH
+          make secrets
           make generate_sources
           make build
       - name: Upload Artifacts

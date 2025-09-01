@@ -21,7 +21,7 @@ The tech stack:
     - `DUCKLAKE_HOST`
     - `DUCKLAKE_USER`
     - `DUCKLAKE_DB_PASSWORD`
-- for convenience and local testing, add the vars mentioned above to a `.env` file (gitignored) and run `./scripts/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
+- for convenience and local testing, add the vars mentioned above to a `.env` file (gitignored) and run `make secrets` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
 - note that the front end is hosted on GitHub pages: https://docs.evidence.dev/deployment/self-host/github-pages
 
 ### Testing set-up: Connecting to the ducklake

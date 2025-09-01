@@ -1,7 +1,6 @@
 import json
 import os
 import requests
-import sys
 import tempfile
 from dotenv import load_dotenv
 
