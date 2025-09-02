@@ -21,16 +21,15 @@ def run():
             periods_in_ducklake = []
 
     # fetch download stats for new periods from s3
+    # NOTE: the bucket is public, so no credentials are required
     new_records = []
     s3_client = boto3.client('s3')
     s3_file_paths = get_s3_file_paths(s3_client)
     for file_path in s3_file_paths:
-        iso_year_str, _, iso_week_str = (
-            file_path.removeprefix('download-stats-weekly/').removesuffix('.json').partition('/')
-        )
+        iso_year_str, _, iso_week_str = file_path.removeprefix(f'{S3_BUCKET_DIR}/').removesuffix('.json').partition('/')
         if not is_valid_iso_year(iso_year_str) or not is_valid_iso_week(iso_week_str):
             raise ValueError(
-                f"invalid file path: '{file_path}'; expected: 'download-stats-weekly/<iso_year>/<iso_week>.json'"
+                f"invalid file path: '{file_path}'; expected: '{S3_BUCKET_DIR}/<iso_year>/<iso_week>.json'"
             )
         year_week_file = (int(iso_year_str), int(iso_week_str))
         if year_week_file not in periods_in_ducklake:
@@ -86,9 +85,7 @@ def get_s3_file_paths(s3):
 
 
 def get_download_stats_from_file(s3_client, file_path):
-    iso_year_str, _, iso_week_str = (
-        file_path.removeprefix('download-stats-weekly/').removesuffix('.json').partition('/')
-    )
+    iso_year_str, _, iso_week_str = file_path.removeprefix(f'{S3_BUCKET_DIR}/').removesuffix('.json').partition('/')
     response = s3_client.get_object(Bucket=S3_BUCKET, Key=file_path)
     content: dict = json.loads(response['Body'].read().decode('utf-8'))
     if '_last_update' not in content:

@@ -1,6 +1,10 @@
-.PHONY: all run_feeds generate_sources build dev
+.PHONY: all secrets run_feeds generate_sources build dev venv
 
 all: run_feeds generate_sources build
+
+# create persistent ducklake secrets
+secrets:
+	python3 -m utils.create_ducklake_secrets
 
 # run feeds to update the ducklake
 run_feeds:
@@ -18,3 +22,8 @@ build:
 # locally test the front end
 dev:
 	npm --prefix ./evidence run dev
+
+# locally set up python venv
+venv:
+	python3 -m venv venv
+	./venv/bin/python3 -m pip install -r requirements.txt

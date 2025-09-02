@@ -1,4 +1,4 @@
+boto3
+duckdb
 dotenv
 requests
-duckdb
-boto3

@@ -1,6 +1,5 @@
 import os
 import requests
-import sys
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
@@ -60,8 +59,8 @@ def fetch_github_record_list(
     if detail_log:
         print(f"fetching from: {url}")
     while True:
-        if detail_log:
-            print(f"page: {page}")
+        if detail_log and page > 1:
+            print(f"page: {page}", flush=True)
         params = {"per_page": per_page, "page": page}
         resp = requests.get(url, headers=headers, params=params)
         if resp.status_code != 200:

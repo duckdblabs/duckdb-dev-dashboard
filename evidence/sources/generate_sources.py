@@ -23,9 +23,12 @@ def main():
     with DuckLakeConnection() as con:
         for source in sources:
             con.execute(f"ATTACH '{source['db_path']}' AS {source['name']};")
-            con.execute(f"USE {source['name']};")
             for table in source["tables"]:
-                con.execute(f"CREATE OR REPLACE TABLE {table} AS FROM my_ducklake.{table};")
+                if con.table_exists(table):
+                    con.execute(f"CREATE OR REPLACE TABLE {source['name']}.main.{table} AS FROM {table};")
+                    print(f"Refreshed file '{source['db_path']}', table: {table} by copying from ducklake", flush=True)
+                else:
+                    print(f"Error: table {table} not present in ducklake; can not refresh: {source['db_path']}!")
 
 
 if __name__ == "__main__":

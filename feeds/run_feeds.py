@@ -13,7 +13,7 @@ FEEDS = [
 def run_all_feeds():
     for name, run_func in FEEDS:
         print("------------------")
-        print(f"running {name} ...")
+        print(f"running {name} ...", flush=True)
         run_func()
 
 

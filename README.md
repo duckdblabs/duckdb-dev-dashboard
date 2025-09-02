@@ -3,24 +3,24 @@ This repository contains the code to operate the `duckdb-dev-dashboard`:
 https://duckdblabs.github.io/duckdb-dev-dashboard
 
 The tech stack:
-- back-end: ducklake, with postgres catalog, and storage on amazon s3
+- back-end: ducklake, with postgres catalog, and storage on cloudflare R2
 - front-end: evidence (https://docs.evidence.dev)
 - hosted: Github Pages
 - updates: periodically via Github actions cron
 
 ## Setup
 
-### Create a postgres-s3-ducklake with DuckDB CLI
-- create a new bucket at Amazon S3, to serve as data store for the ducklake. Get the following vars:
-    - `AWS_ACCESS_KEY_ID`
-    - `AWS_SECRET_ACCESS_KEY`
-    - `AWS_REGION`
-    - `DUCKLAKE_S3_BUCKET` (the path of the bucket, e.g. `s3:duckdb-ci-dashboard-lake/`)
+### Create a postgres-r2-ducklake with DuckDB CLI
+- create a bucket at Cloudflare R2, to serve as data store for the ducklake. Get the following vars:
+    - `DUCKLAKE_STORAGE_S3_KEY_ID`
+    - `DUCKLAKE_STORAGE_S3_SECRET`
+    - `DUCKLAKE_STORAGE_S3_ENDPOINT` (the path of the bucket, e.g. `r2://my-bucket/`)
+    - `DUCKLAKE_STORAGE_R2_ACCOUNT_ID`
 - create a Postgres server, e.g. at https://neon.com/ to serve as catalog for the ducklake. Get the following vars, (mentioned in the `connection string`):
-    - `DUCKLAKE_HOST`
-    - `DUCKLAKE_USER`
-    - `DUCKLAKE_DB_PASSWORD`
-- for convenience and local testing, add the vars mentioned above to an `.env` file (gitignored) and run `./scripts/create_persistent_secrets.sh` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
+    - `DUCKLAKE_CATALOG_PG_HOST`
+    - `DUCKLAKE_CATALOG_PG_USER`
+    - `DUCKLAKE_CATALOG_PG_PASSWORD`
+- for convenience and local testing, add the vars mentioned above to a `.env` file (gitignored) and run `make secrets` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
 - note that the front end is hosted on GitHub pages: https://docs.evidence.dev/deployment/self-host/github-pages
 
 ### Testing set-up: Connecting to the ducklake
@@ -40,7 +40,7 @@ SELECT * FROM ducklake_metadata;
 
 - to directly query the data store (with the credentials created above) e.g.:
 ```sql
-SELECT * FROM glob('s3://duckdb-ci-dashboard-lake/**/*');
+SELECT * FROM glob('r2://my-r2-bucket/**/*');
 ```
 
 ## Adding Dashboards

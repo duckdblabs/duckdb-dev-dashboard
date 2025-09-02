@@ -1,7 +1,6 @@
 import json
 import os
 import requests
-import sys
 import tempfile
 from dotenv import load_dotenv
 
@@ -51,7 +50,6 @@ def update_workflow_runs():
         if not con.table_exists(GITHUB_RUNS_TABLE):
             is_inital_run = True
             latest_previously_stored = 0
-            runs = fetch_github_actions_runs(True, rate_limit)
         else:
             if con.table_empty(GITHUB_RUNS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
@@ -101,7 +99,7 @@ def update_run_jobs():
     total_runs = len(run_ids)
     count = 1
     for (run_id,) in run_ids:
-        print(f"{count}/{total_runs}")
+        print(f"{count}/{total_runs}", flush=True)
         endpoint = GITHUB_JOBS_ENDPOINT.format(GITHUB_REPO=GITHUB_REPO, RUN_ID=run_id)
         _, jobs, error = fetch_github_record_list(endpoint, 'jobs', adjusted_rate_limit, detail_log=True)
         if error:
@@ -182,7 +180,7 @@ def fetch_github_actions_runs(initial_run, rate_limit, latest_previously_stored=
     fetched_workflow_runs = []
     print(f"fetching from: {GITHUB_RUNS_ENDPOINT}")
     while True:
-        print(f"page: {page}")
+        print(f"page: {page}", flush=True)
         params = {"per_page": 100, "page": page}
         resp = requests.get(GITHUB_RUNS_ENDPOINT, headers=headers, params=params)
         if resp.status_code != 200:
