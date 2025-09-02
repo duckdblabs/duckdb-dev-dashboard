@@ -3,8 +3,6 @@ from botocore.exceptions import ClientError
 from collections import OrderedDict
 import json
 import re
-import os
-from dotenv import load_dotenv
 
 from utils.ducklake import DuckLakeConnection
 
