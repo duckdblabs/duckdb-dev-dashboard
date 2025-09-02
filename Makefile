@@ -1,4 +1,4 @@
-.PHONY: all secrets run_feeds generate_sources build dev
+.PHONY: all secrets run_feeds generate_sources build dev venv
 
 all: run_feeds generate_sources build
 
