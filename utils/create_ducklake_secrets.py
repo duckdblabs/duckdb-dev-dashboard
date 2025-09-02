@@ -13,11 +13,11 @@ load_dotenv()
 Q_CATALOG_SECRET = f"""
     CREATE OR REPLACE PERSISTENT SECRET pg_secret (
         TYPE postgres,
-        HOST '{os.getenv('DUCKLAKE_HOST')}',
+        HOST '{os.getenv('DUCKLAKE_CATALOG_PG_HOST')}',
         PORT 5432,
         DATABASE ducklake_catalog,
-        USER '{os.getenv('DUCKLAKE_USER')}',
-        PASSWORD '{os.getenv('DUCKLAKE_DB_PASSWORD')}'
+        USER '{os.getenv('DUCKLAKE_CATALOG_PG_USER')}',
+        PASSWORD '{os.getenv('DUCKLAKE_CATALOG_PG_PASSWORD')}'
     )
     """
 
@@ -25,11 +25,11 @@ Q_CATALOG_SECRET = f"""
 Q_STORAGE_SECRET = f"""
     CREATE OR REPLACE PERSISTENT SECRET r2_secret (
         TYPE r2,
-        ACCOUNT_ID '{os.getenv('R2_ACCOUNT_ID')}',
-        KEY_ID '{os.getenv('S3_KEY_ID')}',
-        SECRET '{os.getenv('S3_SECRET_KEY')}',
+        ACCOUNT_ID '{os.getenv('DUCKLAKE_STORAGE_R2_ACCOUNT_ID')}',
+        KEY_ID '{os.getenv('DUCKLAKE_STORAGE_S3_KEY_ID')}',
+        SECRET '{os.getenv('DUCKLAKE_STORAGE_S3_SECRET')}',
         REGION 'auto',
-        SCOPE '{os.getenv('S3_ENDPOINT')}'
+        SCOPE '{os.getenv('DUCKLAKE_STORAGE_S3_ENDPOINT')}'
     )
     """
 
@@ -38,7 +38,7 @@ Q_DUCKLAKE_SECRET = f"""
     CREATE OR REPLACE PERSISTENT SECRET ducklake_secret (
         TYPE ducklake,
         METADATA_PATH '',
-        DATA_PATH '{os.getenv('S3_ENDPOINT')}',
+        DATA_PATH '{os.getenv('DUCKLAKE_STORAGE_S3_ENDPOINT')}',
         METADATA_PARAMETERS MAP {{'TYPE': 'postgres', 'SECRET': 'pg_secret'}}
     )
     """
@@ -53,12 +53,12 @@ def create_ducklake_secrets():
 
 def validate_env():
     required_env_vars = [
-        "S3_KEY_ID",
-        "S3_SECRET_KEY",
-        "S3_ENDPOINT",
-        "DUCKLAKE_DB_PASSWORD",
-        "DUCKLAKE_HOST",
-        "DUCKLAKE_USER",
+        "DUCKLAKE_STORAGE_S3_KEY_ID",
+        "DUCKLAKE_STORAGE_S3_SECRET",
+        "DUCKLAKE_STORAGE_S3_ENDPOINT",
+        "DUCKLAKE_CATALOG_PG_PASSWORD",
+        "DUCKLAKE_CATALOG_PG_HOST",
+        "DUCKLAKE_CATALOG_PG_USER",
     ]
     for env_var in required_env_vars:
         if env_var not in os.environ.keys():

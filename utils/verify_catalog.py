@@ -15,9 +15,9 @@ CATALOG_DB_NAME = 'ducklake_catalog'
 def create_catalog_db_if_not_exists():
     con = psycopg2.connect(
         dbname="postgres",
-        user=os.environ["DUCKLAKE_USER"],
-        host=os.environ["DUCKLAKE_HOST"],
-        password=os.environ["DUCKLAKE_DB_PASSWORD"],
+        user=os.environ["DUCKLAKE_CATALOG_PG_USER"],
+        host=os.environ["DUCKLAKE_CATALOG_PG_HOST"],
+        password=os.environ["DUCKLAKE_CATALOG_PG_PASSWORD"],
     )
     con.autocommit = True
     try:

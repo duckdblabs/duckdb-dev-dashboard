@@ -9,15 +9,15 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ducklake storage credentials (also use for cloudflare):
-  S3_KEY_ID: ${{ secrets.S3_KEY_ID }}
-  S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-  S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
-  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+  DUCKLAKE_STORAGE_S3_KEY_ID: ${{ secrets.DUCKLAKE_STORAGE_S3_KEY_ID }}
+  DUCKLAKE_STORAGE_S3_SECRET: ${{ secrets.DUCKLAKE_STORAGE_S3_SECRET }}
+  DUCKLAKE_STORAGE_S3_ENDPOINT: ${{ secrets.DUCKLAKE_STORAGE_S3_ENDPOINT }}
+  DUCKLAKE_STORAGE_R2_ACCOUNT_ID: ${{ secrets.DUCKLAKE_STORAGE_R2_ACCOUNT_ID }}
 
   # ducklake catalog credentials:
-  DUCKLAKE_DB_PASSWORD: ${{ secrets.DUCKLAKE_DB_PASSWORD }}
-  DUCKLAKE_HOST: ${{ secrets.DUCKLAKE_HOST }}
-  DUCKLAKE_USER: ${{ secrets.DUCKLAKE_USER }}
+  DUCKLAKE_CATALOG_PG_PASSWORD: ${{ secrets.DUCKLAKE_CATALOG_PG_PASSWORD }}
+  DUCKLAKE_CATALOG_PG_HOST: ${{ secrets.DUCKLAKE_CATALOG_PG_HOST }}
+  DUCKLAKE_CATALOG_PG_USER: ${{ secrets.DUCKLAKE_CATALOG_PG_USER }}
 
   # additional credentials (required for some data feeds):
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
