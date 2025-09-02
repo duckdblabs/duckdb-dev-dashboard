@@ -23,3 +23,8 @@ build:
 # locally test the front end
 dev:
 	npm --prefix ./evidence run dev
+
+# locally set up python venv
+venv:
+	python3 -m venv venv
+	./venv/bin/python3 -m pip install -r requirements.txt
