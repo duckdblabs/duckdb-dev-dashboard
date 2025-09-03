@@ -21,7 +21,6 @@ def run():
             periods_in_ducklake = []
 
     # fetch download stats for new periods from s3
-    # NOTE: the bucket is public, so no credentials are required
     new_records = []
     s3_client = boto3.client('s3')
     s3_file_paths = get_s3_file_paths(s3_client)
