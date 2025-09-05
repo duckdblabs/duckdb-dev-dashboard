@@ -2,6 +2,7 @@ import json
 import os
 import requests
 import tempfile
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from utils.ducklake import DuckLakeConnection
@@ -157,10 +158,12 @@ def store_runs(runs, is_initial_run, latest_previously_stored):
         tmp.flush()
         with DuckLakeConnection() as con:
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
+            # runs are considered 'stale' after 24 hours (even if their status somehow is stuck in 'in progress')
+            stale_timestamp = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
             subquery = f"""
                         (
                         select * from read_json('{tmp.name}')
-                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed')
+                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed' and created_at > TIMESTAMP '{stale_timestamp}')
                         and id > {latest_previously_stored}
                         )
                         """
@@ -169,7 +172,7 @@ def store_runs(runs, is_initial_run, latest_previously_stored):
             else:
                 con.execute(f"insert into {GITHUB_RUNS_TABLE} {subquery}")
             print('stored rows:')
-            con.sql(f"select id, created_at, html_url, '...' as 'more ...' from {subquery} order by id").show()
+            con.sql(f"select id, created_at, status, html_url, '...' as 'more ...' from {subquery} order by id").show()
 
 
 def fetch_github_actions_runs(initial_run, rate_limit, latest_previously_stored=0):
