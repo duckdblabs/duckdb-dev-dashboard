@@ -83,7 +83,7 @@ def update_run_jobs():
                 FROM ci_runs runs
                 LEFT JOIN ci_jobs jobs ON runs.id = jobs.run_id
                 WHERE jobs.run_id is NULL
-                {f"AND runs.created_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
+                {f"AND runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
                 """
             ).fetchone()[0]
             print(f"jobs need to be fetched for {total_count_star} runs")
@@ -95,7 +95,7 @@ def update_run_jobs():
                 FROM ci_runs runs
                 LEFT JOIN ci_jobs jobs ON runs.id = jobs.run_id
                 WHERE jobs.run_id is NULL
-                {f"AND runs.created_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
+                {f"AND runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
                 ORDER BY runs.id ASC
                 LIMIT {adjusted_rate_limit}
             """
@@ -169,7 +169,7 @@ def store_runs(runs, is_initial_run, latest_previously_stored):
             subquery = f"""
                         (
                         select * from read_json('{tmp.name}')
-                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed' and created_at > TIMESTAMP '{stale_timestamp}')
+                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}')
                         and id > {latest_previously_stored}
                         )
                         """
