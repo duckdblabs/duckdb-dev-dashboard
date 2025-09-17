@@ -72,13 +72,18 @@ def update_run_jobs():
                 f"select id from {GITHUB_RUNS_TABLE} where status='completed' order by id ASC limit {adjusted_rate_limit}"
             ).fetchall()
         else:
+            # Runs without jobs are considered 'stale' after 48 hours.
+            # We'll stop querying for jobs for stale runs, to prevent repeating useless API calls.
+            # To fetch the full history, replace with: stale_timestamp = None
+            stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
             # fetch the runs for which the jobs are still missing
             total_count_star = con.sql(
-                """
+                f"""
                 SELECT count(*)
                 FROM ci_runs runs
                 LEFT JOIN ci_jobs jobs ON runs.id = jobs.run_id
                 WHERE jobs.run_id is NULL
+                {f"AND runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
                 """
             ).fetchone()[0]
             print(f"jobs need to be fetched for {total_count_star} runs")
@@ -90,6 +95,7 @@ def update_run_jobs():
                 FROM ci_runs runs
                 LEFT JOIN ci_jobs jobs ON runs.id = jobs.run_id
                 WHERE jobs.run_id is NULL
+                {f"AND runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
                 ORDER BY runs.id ASC
                 LIMIT {adjusted_rate_limit}
             """
@@ -158,12 +164,12 @@ def store_runs(runs, is_initial_run, latest_previously_stored):
         tmp.flush()
         with DuckLakeConnection() as con:
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
-            # runs are considered 'stale' after 24 hours (even if their status somehow is stuck in 'in progress')
-            stale_timestamp = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+            # runs are considered 'stale' after 48 hours (even if their status somehow is stuck in 'in progress')
+            stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
             subquery = f"""
                         (
                         select * from read_json('{tmp.name}')
-                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed' and created_at > TIMESTAMP '{stale_timestamp}')
+                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}')
                         and id > {latest_previously_stored}
                         )
                         """
