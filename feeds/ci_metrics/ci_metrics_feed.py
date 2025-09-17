@@ -158,8 +158,8 @@ def store_runs(runs, is_initial_run, latest_previously_stored):
         tmp.flush()
         with DuckLakeConnection() as con:
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
-            # runs are considered 'stale' after 24 hours (even if their status somehow is stuck in 'in progress')
-            stale_timestamp = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+            # runs are considered 'stale' after 48 hours (even if their status somehow is stuck in 'in progress')
+            stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
             subquery = f"""
                         (
                         select * from read_json('{tmp.name}')
