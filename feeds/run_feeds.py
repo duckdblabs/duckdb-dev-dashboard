@@ -14,7 +14,10 @@ def run_all_feeds():
     for name, run_func in FEEDS:
         print("------------------")
         print(f"running {name} ...", flush=True)
-        run_func()
+        try:
+            run_func()
+        except ValueError as e:
+            print(f"::warning data-feed {name}, failed with error: {e}")
 
 
 if __name__ == "__main__":
