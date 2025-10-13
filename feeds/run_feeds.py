@@ -17,7 +17,7 @@ def run_all_feeds():
         try:
             run_func()
         except ValueError as e:
-            print(f"::warning data-feed {name}, failed with error: {e}")
+            print(f"::warning title={name}::data-feed '{name}' failed: {e}")
 
 
 if __name__ == "__main__":
