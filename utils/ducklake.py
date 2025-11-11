@@ -23,6 +23,12 @@ class DuckLakeConnection:
     def execute(self, sql_str):
         return self.con.execute(sql_str)
 
+    def fetchone(self):
+        return self.con.fetchone()
+
+    def fetchall(self):
+        return self.con.fetchall()
+
     def table_exists(self, table_name: str) -> bool:
         return self.con.sql(
             f"select 1 from duckdb_tables() where table_name='{table_name}' and database_name='{self.ducklake_db_alias}'"
@@ -49,6 +55,22 @@ class DuckLakeConnection:
             tmp.write(json_str)
             tmp.flush()
             self.con.execute(f"insert into {table_name} from read_json('{tmp.name}')")
+
+    def current_snapshot(self):
+        return self.con.sql(f"from {self.ducklake_db_alias}.current_snapshot()").fetchone()[0]
+
+    def table_changes(self, tbl, snapshot_start, snapshot_end):
+        # returns new or updated records
+        return self.con.sql(f"""
+                            select * exclude (snapshot_id, rowid, change_type)
+                              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
+                              where change_type = 'update_postimage'
+                            except
+                            select * exclude (snapshot_id, rowid, change_type)
+                              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
+                              where change_type = 'update_preimage'
+                            order by id;
+                        """)
 
 
 # example usage:
