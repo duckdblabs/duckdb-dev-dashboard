@@ -39,8 +39,7 @@ class RepoRatelimits:
 
 
 def run():
-    # repo_names = fetch_repo_names(GITHUB_ORG)
-    repo_names = ['duckdb/duckdb']  # for now, only run 'duckdb/duckdb'
+    repo_names = fetch_repo_names(GITHUB_ORG)
     if not repo_names:
         raise ValueError(f"No repositories could be fetched for organisation '{GITHUB_ORG}'")
 
@@ -57,8 +56,8 @@ def run():
 
 
 def update_workflows(github_repo):
-    assert re.fullmatch(r"[a-z]+/[a-z]+", github_repo)  # format: 'org/repo_name'
     print(f"updating workflows for: {github_repo}")
+    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched" # format: 'org/repo_name'
     endpoint = GITHUB_WORKFLOWS_ENDPOINT.format(GITHUB_REPO=github_repo)
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_WORKFLOWS_TABLE):
@@ -77,8 +76,8 @@ def update_workflows(github_repo):
 
 
 def update_runs(github_repo: str, rate_limits: RepoRatelimits):
-    assert re.fullmatch(r"[a-z]+/[a-z]+", github_repo)
     print(f"updating workflow runs for: {github_repo}")
+    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched" # format: 'org/repo_name'
     rate_limit = rate_limits.get_repo_rate_limit(github_repo)
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_RUNS_TABLE):
@@ -96,13 +95,13 @@ def update_runs(github_repo: str, rate_limits: RepoRatelimits):
 
 
 def update_jobs(github_repo, rate_limits: RepoRatelimits):
-    assert re.fullmatch(r"[a-z]+/[a-z]+", github_repo)
     print(f"updating jobs for: {github_repo}")
+    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched" # format: 'org/repo_name'
     rate_limit = rate_limits.get_repo_rate_limit(github_repo)
 
     # first get the run_ids, we need them to fetch the jobs
     with DuckLakeConnection() as con:
-        assert con.table_exists(GITHUB_RUNS_TABLE)
+        assert con.table_exists(GITHUB_RUNS_TABLE), f"tabel {GITHUB_RUNS_TABLE} does not exist"
         create_table = True if not con.table_exists(GITHUB_JOBS_TABLE) else False
         if create_table:
             con.execute(
