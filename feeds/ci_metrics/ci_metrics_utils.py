@@ -4,6 +4,7 @@ from utils.ducklake import DuckLakeConnection
 from utils.github_utils import get_rate_limit, gh_api_request
 from .ci_config import *
 
+
 class RepoRatelimits:
     # repo 'duckdb/duckdb' gets 50% of the rate limit
     # other repos equally share the remainder
@@ -53,7 +54,9 @@ def get_run_ids_count(con: DuckLakeConnection, github_repo: str) -> int:
     return con.fetchone()[0]
 
 
-def get_recent_run_ids_without_jobs_count(con: DuckLakeConnection, github_repo: str, max_age: int | None = None) -> int:
+def get_recent_run_ids_without_jobs_count(
+    con: DuckLakeConnection, github_repo: str, max_age: int | None = GITHUB_RUNS_STALE_DELAY
+) -> int:
     # Note: max_age age can be set to to filter out stale runs.
     stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
     con.execute(
@@ -88,7 +91,7 @@ def get_run_ids(con: DuckLakeConnection, github_repo: str, limit: int | None = N
 
 # fetch the runs for which the jobs are still missing
 def get_recent_run_ids_without_jobs(
-    con: DuckLakeConnection, github_repo: str, limit: int | None = None, max_age: int | None = None
+    con: DuckLakeConnection, github_repo: str, limit: int | None = None, max_age: int | None = GITHUB_RUNS_STALE_DELAY
 ) -> list[int]:
     # Note: max_age age can be set to to filter out stale runs.
     stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
@@ -107,6 +110,7 @@ def get_recent_run_ids_without_jobs(
         [github_repo],
     )
     return con.fetchall()
+
 
 def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previously_stored: int | None = None) -> list:
     endpoint = GITHUB_RUNS_ENDPOINT.format(GITHUB_REPO=github_repo)
