@@ -57,7 +57,7 @@ def run():
 
 def update_workflows(github_repo):
     print(f"updating workflows for: {github_repo}")
-    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched" # format: 'org/repo_name'
+    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
     endpoint = GITHUB_WORKFLOWS_ENDPOINT.format(GITHUB_REPO=github_repo)
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_WORKFLOWS_TABLE):
@@ -77,7 +77,7 @@ def update_workflows(github_repo):
 
 def update_runs(github_repo: str, rate_limits: RepoRatelimits):
     print(f"updating workflow runs for: {github_repo}")
-    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched" # format: 'org/repo_name'
+    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
     rate_limit = rate_limits.get_repo_rate_limit(github_repo)
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_RUNS_TABLE):
@@ -94,64 +94,117 @@ def update_runs(github_repo: str, rate_limits: RepoRatelimits):
         store_runs(runs, create_table, latest_previously_stored)
 
 
+def get_jobs_table_state(con: DuckLakeConnection, github_repo: str) -> tuple[bool, bool]:
+    if not con.table_exists(GITHUB_JOBS_TABLE):
+        create_table = True
+        is_first_run = True
+    else:
+        create_table = False
+        is_first_run: bool = con.sql(
+            f"""
+            select not exists (
+              select 1
+              from {GITHUB_JOBS_TABLE}
+              join {GITHUB_RUNS_TABLE} on {GITHUB_JOBS_TABLE}.run_id = {GITHUB_RUNS_TABLE}.id
+              where {GITHUB_RUNS_TABLE}.repository['full_name'] == '{github_repo}'
+            );
+            """
+        ).fetchone()[0]
+    return (create_table, is_first_run)
+
+
+def get_run_ids_count(con: DuckLakeConnection, github_repo: str) -> int:
+    con.execute(
+        f"""
+        select count(*)
+        from {GITHUB_RUNS_TABLE} runs
+        where runs.status='completed'
+        and runs.repository['full_name'] = ?
+        order by runs.id ASC
+        """,
+        [github_repo],
+    )
+    return con.fetchone()[0]
+
+
+def get_recent_run_ids_without_jobs_count(con: DuckLakeConnection, github_repo: str, max_age: int | None = None) -> int:
+    # Note: max_age age can be set to to filter out stale runs.
+    stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
+    con.execute(
+        f"""
+        select count(*)
+        from {GITHUB_RUNS_TABLE} runs
+        left join {GITHUB_JOBS_TABLE} jobs on runs.id = jobs.run_id
+        where jobs.run_id is NULL
+        and runs.status='completed'
+        {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
+        and runs.repository['full_name'] = ?
+        """,
+        [github_repo],
+    )
+    return con.fetchone()[0]
+
+
+def get_run_ids(con: DuckLakeConnection, github_repo: str, limit: int | None = None) -> list[int]:
+    con.execute(
+        f"""
+        select runs.id
+        from {GITHUB_RUNS_TABLE} runs
+        where runs.status='completed'
+        and runs.repository['full_name'] = ?
+        order by runs.id ASC
+        {f"limit {limit}" if limit else ''}
+        """,
+        [github_repo],
+    )
+    return con.fetchall()
+
+
+# fetch the runs for which the jobs are still missing
+def get_recent_run_ids_without_jobs(
+    con: DuckLakeConnection, github_repo: str, limit: int | None = None, max_age: int | None = None
+) -> list[int]:
+    # Note: max_age age can be set to to filter out stale runs.
+    stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
+    con.execute(
+        f"""
+        select runs.id
+        from {GITHUB_RUNS_TABLE} runs
+        left join {GITHUB_JOBS_TABLE} jobs on runs.id = jobs.run_id
+        where jobs.run_id is NULL
+        and runs.status='completed'
+        {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
+        and runs.repository['full_name'] = ?
+        order by runs.id ASC
+        {f"limit {limit}" if limit else ''}
+        """,
+        [github_repo],
+    )
+    return con.fetchall()
+
+
 def update_jobs(github_repo, rate_limits: RepoRatelimits):
     print(f"updating jobs for: {github_repo}")
-    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched" # format: 'org/repo_name'
+    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
     rate_limit = rate_limits.get_repo_rate_limit(github_repo)
 
     # first get the run_ids, we need them to fetch the jobs
     with DuckLakeConnection() as con:
         assert con.table_exists(GITHUB_RUNS_TABLE), f"tabel {GITHUB_RUNS_TABLE} does not exist"
-        create_table = True if not con.table_exists(GITHUB_JOBS_TABLE) else False
-        if create_table:
-            con.execute(
-                f"""
-                select runs.id
-                from {GITHUB_RUNS_TABLE} runs
-                where runs.status='completed'
-                and runs.repository['full_name'] = ?
-                order by runs.id ASC
-                limit {rate_limit}
-                """,
-                [github_repo]
-            )
-            run_ids = con.fetchall()
-        else:
-            # Runs without jobs are considered 'stale' after 48 hours.
-            # We'll stop querying for jobs for stale runs, to prevent repeating useless API calls.
-            # To fetch the full history, replace with: stale_timestamp = None
-            stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
-            # fetch the runs for which the jobs are still missing
-            con.execute(
-                f"""
-                select count(*)
-                from {GITHUB_RUNS_TABLE} runs
-                left join {GITHUB_JOBS_TABLE} jobs on runs.id = jobs.run_id
-                where jobs.run_id is NULL
-                {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
-                and runs.repository['full_name'] = ?
-                """,
-                [github_repo]
-            )
-            count_runs_without_jobs = con.fetchone()[0]
-            print(f"jobs need to be fetched for {count_runs_without_jobs} runs for repo {github_repo}")
-            if count_runs_without_jobs > rate_limit:
-                print(f"applying rate limit: fetching jobs for {rate_limit} runs")
-            con.execute(
-                f"""
-                select runs.id
-                from {GITHUB_RUNS_TABLE} runs
-                left join {GITHUB_JOBS_TABLE} jobs on runs.id = jobs.run_id
-                where jobs.run_id is NULL
-                {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
-                and runs.repository['full_name'] = ?
-                order by runs.id ASC
-                limit {rate_limit}
-                """,
-                [github_repo]
-            )
-            run_ids = con.fetchall()
-
+        create_table, is_first_run = get_jobs_table_state(con, github_repo)
+        run_ids_count = (
+            get_run_ids_count(con, github_repo)
+            if is_first_run
+            else get_recent_run_ids_without_jobs_count(con, github_repo)
+        )
+        print(f"jobs need to be fetched for {run_ids_count} runs for repo {github_repo}")
+        if run_ids_count > rate_limit:
+            print(f"applying rate limit: fetching jobs for {rate_limit} runs")
+        run_ids = (
+            get_run_ids(con, github_repo, rate_limit)
+            if is_first_run
+            else get_recent_run_ids_without_jobs(con, github_repo, rate_limit)
+        )
     # fetch jobs from github
     new_jobs = []
     print('fetching jobs per run:')
@@ -180,13 +233,16 @@ def store_workflows(workflows, create_table):
                 print('created table and stored rows:')
                 con.sql(f"select * from {GITHUB_WORKFLOWS_TABLE} order by id").show()
             else:
-                con.execute(f"""
-                            merge into {GITHUB_WORKFLOWS_TABLE}
-                              using {subquery} as upserts
-                              on ({GITHUB_WORKFLOWS_TABLE}.id = upserts.id and {GITHUB_WORKFLOWS_TABLE}.repository = upserts.repository)
-                              when matched then update
-                              when not matched then insert;
-                            """)
+                con.execute(
+                    f"""
+                    merge into {GITHUB_WORKFLOWS_TABLE}
+                    using {subquery} as upserts
+                    on ({GITHUB_WORKFLOWS_TABLE}.id = upserts.id
+                      and {GITHUB_WORKFLOWS_TABLE}.repository = upserts.repository)
+                    when matched then update
+                    when not matched then insert;
+                    """
+                )
                 print("new or updated workflows:")
                 current_snapshot = con.current_snapshot()
                 con.table_changes(GITHUB_WORKFLOWS_TABLE, current_snapshot, current_snapshot).show()
@@ -201,7 +257,9 @@ def store_runs(runs, create_table, latest_previously_stored):
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
             # runs are considered 'stale' after 48 hours (even if their status somehow is stuck in 'in progress')
             stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
-            oldest_non_completed = con.sql(f"select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}'").fetchone()[0]
+            oldest_non_completed = con.sql(
+                f"select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}'"
+            ).fetchone()[0]
             subquery = f"""
                         (
                         select * from read_json('{tmp.name}')
@@ -233,7 +291,7 @@ def store_jobs(jobs, create_table):
             con.sql(f"select * from {subquery} order by id").show()
 
 
-def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previously_stored: int | None = None ) -> list:
+def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previously_stored: int | None = None) -> list:
     endpoint = GITHUB_RUNS_ENDPOINT.format(GITHUB_REPO=github_repo)
     page = 1
     fetched_workflow_runs = []
@@ -250,7 +308,9 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
             if latest_previously_stored == None:
                 print(f"rate limit ({rate_limit}) hit!")
             else:
-                print(f"WARNING: rate limit ({rate_limit}) hit, but connecting run id not found. Storing nothing to prevent gaps")
+                print(
+                    f"WARNING: rate limit ({rate_limit}) hit, but connecting run id not found. Storing nothing to prevent gaps"
+                )
                 fetched_workflow_runs = []
             break
         if len(data) < 100:
