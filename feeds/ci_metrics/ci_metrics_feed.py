@@ -201,10 +201,12 @@ def store_runs(runs, create_table, latest_previously_stored):
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
             # runs are considered 'stale' after 48 hours (even if their status somehow is stuck in 'in progress')
             stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
+            oldest_non_completed = con.sql(f"select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}'").fetchone()[0]
             subquery = f"""
                         (
                         select * from read_json('{tmp.name}')
-                        where id < (select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}')
+                        where True
+                        {f"and id < {oldest_non_completed}" if oldest_non_completed else ''}
                         {f"and id > {latest_previously_stored}" if latest_previously_stored else ''}
                         )
                         """
