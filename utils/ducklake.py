@@ -56,25 +56,27 @@ class DuckLakeConnection:
             tmp.flush()
             self.con.execute(f"insert into {table_name} from read_json('{tmp.name}')")
 
-    def current_snapshot(self):
+    def current_snapshot(self) -> int:
         return self.con.sql(f"from {self.ducklake_db_alias}.current_snapshot()").fetchone()[0]
 
     def table_changes(self, tbl, snapshot_start, snapshot_end):
         # returns new or updated records
-        return self.con.sql(f"""
-                            select * exclude (snapshot_id, rowid, change_type)
-                              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
-                              where change_type = 'insert'
-                            union
-                            select * exclude (snapshot_id, rowid, change_type)
-                              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
-                              where change_type = 'update_postimage'
-                            except
-                            select * exclude (snapshot_id, rowid, change_type)
-                              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
-                              where change_type = 'update_preimage'
-                            order by id;
-                        """)
+        return self.con.sql(
+            f"""
+            select * exclude (snapshot_id, rowid, change_type)
+              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
+              where change_type = 'insert'
+            union
+            select * exclude (snapshot_id, rowid, change_type)
+              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
+              where change_type = 'update_postimage'
+            except
+            select * exclude (snapshot_id, rowid, change_type)
+              from {self.ducklake_db_alias}.table_changes('{tbl}', {snapshot_start}, {snapshot_end})
+              where change_type = 'update_preimage'
+            order by id;
+            """
+        )
 
 
 # example usage:

@@ -13,7 +13,7 @@ from .ci_metrics_utils import (
     get_run_ids_count,
     get_recent_run_ids_without_jobs,
     get_recent_run_ids_without_jobs_count,
-    fetch_github_actions_runs
+    fetch_github_actions_runs,
 )
 from .ci_config import *
 
@@ -25,13 +25,16 @@ def run():
     if not repo_names:
         raise ValueError(f"No repositories could be fetched for organisation '{GITHUB_ORG}'")
 
+    print(f"===============\nupdating ci workflows")
     for repo_name in repo_names:
         update_workflows(repo_name)
 
+    print(f"===============\nupdating ci runs")
     rate_limits_runs = RepoRatelimits(repo_names)
     for repo_name in repo_names:
         update_runs(repo_name, rate_limits_runs)
 
+    print(f"===============\nupdating ci jobs")
     rate_limits_jobs = RepoRatelimits(repo_names)
     for repo_name in repo_names:
         update_jobs(repo_name, rate_limits_jobs)
@@ -61,6 +64,9 @@ def update_runs(github_repo: str, rate_limits: RepoRatelimits):
     print(f"updating workflow runs for: {github_repo}")
     assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
     rate_limit = rate_limits.get_repo_rate_limit(github_repo)
+    if rate_limit == 0:
+        print("skipping - rate limit 0")
+        return
     with DuckLakeConnection() as con:
         if not con.table_exists(GITHUB_RUNS_TABLE):
             create_table = True
@@ -136,22 +142,31 @@ def store_workflows(workflows, create_table):
                     when not matched then insert;
                     """
                 )
-                print("new or updated workflows:")
+                # NOTE: we assume a new snapshot is created after every 'merge into', even if there are no changes, see: https://github.com/duckdblabs/duckdb-internal/issues/6557
                 current_snapshot = con.current_snapshot()
-                con.table_changes(GITHUB_WORKFLOWS_TABLE, current_snapshot, current_snapshot).show()
+                rel = con.table_changes(GITHUB_WORKFLOWS_TABLE, current_snapshot, current_snapshot)
+                if rel.fetchone():
+                    print("new or updated workflows:")
+                    rel.show()
+                else:
+                    print('no updates')
 
 
-def store_runs(runs, create_table, latest_previously_stored):
+def store_runs(runs, create_table, latest_previously_stored, max_age: int | None = GITHUB_RUNS_STALE_DELAY):
     runs_str = f"[{',\n'.join([json.dumps(r) for r in runs])}]"
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".json") as tmp:
         tmp.write(runs_str)
         tmp.flush()
         with DuckLakeConnection() as con:
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
-            # runs are considered 'stale' after 48 hours (even if their status somehow is stuck in 'in progress')
-            stale_timestamp = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
+            # Note: max_age age can be set to to filter out stale runs.
+            stale_timestamp = (
+                (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
+            )
             oldest_non_completed = con.sql(
-                f"select min(id) from read_json('{tmp.name}') where status != 'completed' and updated_at > TIMESTAMP '{stale_timestamp}'"
+                f"""select min(id) from read_json('{tmp.name}') where status != 'completed'
+                {f"and updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
+                """
             ).fetchone()[0]
             subquery = f"""
                         (
@@ -161,11 +176,14 @@ def store_runs(runs, create_table, latest_previously_stored):
                         {f"and id > {latest_previously_stored}" if latest_previously_stored else ''}
                         )
                         """
+            if not con.sql(f"from {subquery} limit 1").fetchone():
+                print("no new runs to store")
+                return
             if create_table:
                 con.execute(f"create table {GITHUB_RUNS_TABLE} as {subquery}")
             else:
                 con.execute(f"insert into {GITHUB_RUNS_TABLE} {subquery}")
-            print('stored rows:')
+            print('stored runs:')
             con.sql(f"select id, created_at, status, html_url, '...' as 'more ...' from {subquery} order by id").show()
 
 

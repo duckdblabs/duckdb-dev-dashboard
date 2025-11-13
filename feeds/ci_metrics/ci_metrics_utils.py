@@ -47,7 +47,6 @@ def get_run_ids_count(con: DuckLakeConnection, github_repo: str) -> int:
         from {GITHUB_RUNS_TABLE} runs
         where runs.status='completed'
         and runs.repository['full_name'] = ?
-        order by runs.id ASC
         """,
         [github_repo],
     )
@@ -119,13 +118,7 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
     print(f"fetching from: {endpoint}")
     while True:
         print(f"page: {page}", flush=True)
-        params = {"per_page": 100, "page": page}
-        resp = gh_api_request(endpoint, params=params)
-        data = resp.get("workflow_runs", [])
-        fetched_workflow_runs.extend(data)
-        if (latest_previously_stored != None) and latest_previously_stored in [run['id'] for run in data]:
-            break
-        if page >= rate_limit:
+        if page > rate_limit:
             if latest_previously_stored == None:
                 print(f"rate limit ({rate_limit}) hit!")
             else:
@@ -133,6 +126,12 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
                     f"WARNING: rate limit ({rate_limit}) hit, but connecting run id not found. Storing nothing to prevent gaps"
                 )
                 fetched_workflow_runs = []
+            break
+        params = {"per_page": 100, "page": page}
+        resp = gh_api_request(endpoint, params=params)
+        data = resp.get("workflow_runs", [])
+        fetched_workflow_runs.extend(data)
+        if (latest_previously_stored != None) and latest_previously_stored in [run['id'] for run in data]:
             break
         if len(data) < 100:
             break
