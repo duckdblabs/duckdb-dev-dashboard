@@ -161,7 +161,7 @@ def store_runs(runs, create_table, latest_previously_stored, max_age: int | None
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
             # Note: max_age age can be set to to filter out stale runs.
             stale_timestamp = (
-                (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
+                (datetime.now() - timedelta(hours=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
             )
             oldest_non_completed = con.sql(
                 f"""select min(id) from read_json('{tmp.name}') where status != 'completed'

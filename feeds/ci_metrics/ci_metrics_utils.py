@@ -54,7 +54,7 @@ def get_run_ids_count(con: DuckLakeConnection, github_repo: str) -> int:
 
 
 def get_recent_run_ids_without_jobs_count(
-    con: DuckLakeConnection, github_repo: str, max_age: int | None = GITHUB_RUNS_STALE_DELAY
+    con: DuckLakeConnection, github_repo: str, max_age: int | None = GITHUB_RUNS_JOB_CUTOFF
 ) -> int:
     # Note: max_age age can be set to to filter out stale runs.
     stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
@@ -90,7 +90,7 @@ def get_run_ids(con: DuckLakeConnection, github_repo: str, limit: int | None = N
 
 # fetch the runs for which the jobs are still missing
 def get_recent_run_ids_without_jobs(
-    con: DuckLakeConnection, github_repo: str, limit: int | None = None, max_age: int | None = GITHUB_RUNS_STALE_DELAY
+    con: DuckLakeConnection, github_repo: str, limit: int | None = None, max_age: int | None = GITHUB_RUNS_JOB_CUTOFF
 ) -> list[int]:
     # Note: max_age age can be set to to filter out stale runs.
     stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
