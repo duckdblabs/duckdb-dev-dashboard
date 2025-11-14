@@ -97,16 +97,20 @@ def update_jobs(github_repo, rate_limits: RepoRatelimits):
             else get_recent_run_ids_without_jobs_count(con, github_repo)
         )
         print(f"jobs need to be fetched for {run_ids_count} runs for repo {github_repo}")
-        if run_ids_count > rate_limit:
-            print(f"applying rate limit: fetching jobs for {rate_limit} runs")
-        run_ids = (
-            get_run_ids(con, github_repo, rate_limit)
-            if is_first_run
-            else get_recent_run_ids_without_jobs(con, github_repo, rate_limit)
-        )
+        if run_ids_count > 0:
+            if run_ids_count > rate_limit:
+                print(f"applying rate limit: fetching jobs for {rate_limit} runs")
+            run_ids = (
+                get_run_ids(con, github_repo, rate_limit)
+                if is_first_run
+                else get_recent_run_ids_without_jobs(con, github_repo, rate_limit)
+            )
+        else:
+            run_ids = []
     # fetch jobs from github
     new_jobs = []
-    print('fetching jobs per run:')
+    if run_ids:
+        print('fetching jobs per run:')
     total_runs = len(run_ids)
     count = 1
     for (run_id,) in run_ids:
@@ -132,7 +136,7 @@ def store_workflows(workflows, create_table):
             subquery = f"(select * from read_json('{tmp.name}'))"
             if create_table:
                 con.execute(f"create table {GITHUB_WORKFLOWS_TABLE} as {subquery}")
-                print('created table and stored rows:')
+                print('created table and stored workflows:')
                 con.sql(f"select * from {GITHUB_WORKFLOWS_TABLE} order by id").show()
             else:
                 con.execute(
@@ -201,7 +205,7 @@ def store_jobs(jobs, create_table):
                 con.execute(f"create table {GITHUB_JOBS_TABLE} as {subquery}")
             else:
                 con.execute(f"insert into {GITHUB_JOBS_TABLE} {subquery}")
-            print('stored rows:')
+            print('stored jobs:')
             con.sql(f"select * from {subquery} order by id").show()
 
 

@@ -14,7 +14,7 @@ GITHUB_JOBS_ENDPOINT = "https://api.github.com/repos/{GITHUB_REPO}/actions/runs/
 GITHUB_RATE_LIMITING_FACTOR = 0.80  # use max 80% of available rate limit
 
 # number of HOURS after which CI runs are considered stale
-# (e.g. if they haven't get to state=finished by now, they probably never will)
+# (e.g. if they didn't get to status=completed by now, they probably never will)
 GITHUB_RUNS_STALE_DELAY: int | None = 48
 
 # after this number of DAYS, we stop trying to fetch jobs for this run
