@@ -112,8 +112,11 @@ def update_jobs(github_repo, rate_limits: RepoRatelimits):
     for (run_id,) in run_ids:
         print(f"{count}/{total_runs}", flush=True)
         endpoint = GITHUB_JOBS_ENDPOINT.format(GITHUB_REPO=github_repo, RUN_ID=run_id)
-        _, jobs = fetch_github_record_list(endpoint, 'jobs', rate_limit, detail_log=True)
-        new_jobs.extend(jobs)
+        try:
+            _, jobs = fetch_github_record_list(endpoint, 'jobs', rate_limit, detail_log=True)
+            new_jobs.extend(jobs)
+        except (ValueError) as e:
+            print(f"::info {e}")
         count += 1
     # store in ducklake
     if new_jobs:
