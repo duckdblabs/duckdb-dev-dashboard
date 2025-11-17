@@ -6,6 +6,12 @@
       "ci_workflows",
       "ci_runs",
       "ci_jobs"
+    ],
+    "materialized_views": [
+      {
+        "table_name": "MV_run_jobs",
+        "query_file": "ci_metrics/run_jobs.sql"
+      }
     ]
   },
   {
