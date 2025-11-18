@@ -24,7 +24,7 @@ def main():
     with DuckLakeConnection() as con:
         # create base tables
         for source in sources:
-            print(f"generating sources for data-feed: {source['name']} ...")
+            print(f"---\ngenerating sources for data-feed: {source['name']} ...")
             con.execute(f"ATTACH '{source['db_path']}' AS {source['name']};")
             for table in source["tables"]:
                 if con.table_exists(table):
