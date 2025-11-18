@@ -2,11 +2,13 @@ GITHUB_ORG = "duckdb"
 DUCKDB_REPO = "duckdb/duckdb"
 
 # ducklake table names
+GITHUB_REPOS_TABLE = "ci_repositories"
 GITHUB_WORKFLOWS_TABLE = "ci_workflows"
 GITHUB_RUNS_TABLE = "ci_runs"
 GITHUB_JOBS_TABLE = "ci_jobs"
 
 # github endpoints
+GITHUB_REPOS_ENDPOINT = "https://api.github.com/orgs/{GITHUB_ORG}/repos".format(GITHUB_ORG=GITHUB_ORG)
 GITHUB_WORKFLOWS_ENDPOINT = "https://api.github.com/repos/{GITHUB_REPO}/actions/workflows"
 GITHUB_RUNS_ENDPOINT = "https://api.github.com/repos/{GITHUB_REPO}/actions/runs"
 GITHUB_JOBS_ENDPOINT = "https://api.github.com/repos/{GITHUB_REPO}/actions/runs/{RUN_ID}/jobs"

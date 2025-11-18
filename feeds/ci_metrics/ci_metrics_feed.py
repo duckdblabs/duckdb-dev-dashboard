@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from utils.ducklake import DuckLakeConnection
-from utils.github_utils import fetch_github_record_list, fetch_repo_names
+from utils.github_utils import fetch_github_record_list, fetch_github_records
 from .ci_metrics_utils import (
     RepoRatelimits,
     get_jobs_table_state,
@@ -21,13 +21,13 @@ load_dotenv()
 
 
 def run():
-    repo_names = fetch_repo_names(GITHUB_ORG)
-    if not repo_names:
-        raise ValueError(f"No repositories could be fetched for organisation '{GITHUB_ORG}'")
+    with DuckLakeConnection() as con:
+        print(f"===============\nupdating repositories")
+        repo_names = update_repositories(con)
 
-    print(f"===============\nupdating ci workflows")
-    for repo_name in repo_names:
-        update_workflows(repo_name)
+        print(f"===============\nupdating ci workflows")
+        for repo_name in repo_names:
+            update_workflows(repo_name, con)
 
     print(f"===============\nupdating ci runs")
     rate_limits_runs = RepoRatelimits(repo_names)
@@ -40,22 +40,32 @@ def run():
         update_jobs(repo_name, rate_limits_jobs)
 
 
-def update_workflows(github_repo):
+def update_repositories(con: DuckLakeConnection) -> list[str]:
+    repos = fetch_github_records(GITHUB_REPOS_ENDPOINT)
+    if not repos:
+        raise ValueError(f"No repositories could be fetched at endpoint: {GITHUB_REPOS_ENDPOINT}'")
+    if con.table_exists(GITHUB_REPOS_TABLE) and con.table_empty(GITHUB_REPOS_TABLE):
+        raise ValueError(f"Invalid state - Table {GITHUB_REPOS_TABLE} should not be empty")
+    con.create_table(GITHUB_REPOS_TABLE, repos, if_not_exists=True, with_no_data=True)
+    con.upsert_table(GITHUB_REPOS_TABLE, repos, ['id'], print_changes=True)
+    repo_names = [repo['full_name'] for repo in repos]
+    return repo_names
+
+
+def update_workflows(github_repo: str, con: DuckLakeConnection):
     print(f"updating workflows for: {github_repo}")
     assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
     endpoint = GITHUB_WORKFLOWS_ENDPOINT.format(GITHUB_REPO=github_repo)
-    with DuckLakeConnection() as con:
-        if not con.table_exists(GITHUB_WORKFLOWS_TABLE):
-            create_table = True
-        else:
-            if con.table_empty(GITHUB_WORKFLOWS_TABLE):
-                raise ValueError(f"Invalid state - Table {GITHUB_WORKFLOWS_TABLE} should not be empty")
-            create_table = False
     _, workflows = fetch_github_record_list(endpoint, 'workflows', detail_log=True)
     if workflows:
         for workflow in workflows:
             workflow['repository'] = github_repo
-        store_workflows(workflows, create_table)
+        if con.table_exists(GITHUB_WORKFLOWS_TABLE):
+            if con.table_empty(GITHUB_WORKFLOWS_TABLE):
+                raise ValueError(f"Invalid state - Table {GITHUB_WORKFLOWS_TABLE} should not be empty")
+            con.upsert_table(GITHUB_WORKFLOWS_TABLE, workflows, ['id', 'repository'], True)
+        else:
+            con.create_table(GITHUB_WORKFLOWS_TABLE, workflows)
     else:
         print(f"no workflows found")
 
@@ -119,44 +129,12 @@ def update_jobs(github_repo, rate_limits: RepoRatelimits):
         try:
             _, jobs = fetch_github_record_list(endpoint, 'jobs', rate_limit, detail_log=True)
             new_jobs.extend(jobs)
-        except (ValueError) as e:
-            print(f"::info {e}")
+        except ValueError as e:
+            print(f"::notice title=could not fetch job::endpoint: '{endpoint}'; Error: {e}")
         count += 1
     # store in ducklake
     if new_jobs:
         store_jobs(new_jobs, create_table)
-
-
-def store_workflows(workflows, create_table):
-    workflows_str = f"[{',\n'.join([json.dumps(w) for w in workflows])}]"
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".json") as tmp:
-        tmp.write(workflows_str)
-        tmp.flush()
-        with DuckLakeConnection() as con:
-            subquery = f"(select * from read_json('{tmp.name}'))"
-            if create_table:
-                con.execute(f"create table {GITHUB_WORKFLOWS_TABLE} as {subquery}")
-                print('created table and stored workflows:')
-                con.sql(f"select * from {GITHUB_WORKFLOWS_TABLE} order by id").show()
-            else:
-                con.execute(
-                    f"""
-                    merge into {GITHUB_WORKFLOWS_TABLE}
-                    using {subquery} as upserts
-                    on ({GITHUB_WORKFLOWS_TABLE}.id = upserts.id
-                      and {GITHUB_WORKFLOWS_TABLE}.repository = upserts.repository)
-                    when matched then update
-                    when not matched then insert;
-                    """
-                )
-                # NOTE: we assume a new snapshot is created after every 'merge into', even if there are no changes, see: https://github.com/duckdblabs/duckdb-internal/issues/6557
-                current_snapshot = con.current_snapshot()
-                rel = con.table_changes(GITHUB_WORKFLOWS_TABLE, current_snapshot, current_snapshot)
-                if rel.fetchone():
-                    print("new or updated workflows:")
-                    rel.show()
-                else:
-                    print('no updates')
 
 
 def store_runs(runs, create_table, latest_previously_stored, max_age: int | None = GITHUB_RUNS_STALE_DELAY):
