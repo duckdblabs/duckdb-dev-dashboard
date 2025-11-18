@@ -3,6 +3,7 @@
     "name": "ci_metrics",
     "db_path": "./evidence/sources/ci_metrics/ci_metrics.duckdb",
     "tables": [
+      "ci_repositories",
       "ci_workflows",
       "ci_runs",
       "ci_jobs"
