@@ -14,7 +14,7 @@ run_feeds:
 generate_sources:
 	python3 -m evidence.sources.generate_sources
 
-# build the front-end
+# build the front-end; this creates a parquet file per table in duckdb file
 build:
 	npm --prefix ./evidence run sources
 	npm --prefix ./evidence run build
