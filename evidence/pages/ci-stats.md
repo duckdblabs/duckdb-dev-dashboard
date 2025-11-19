@@ -78,7 +78,7 @@ select distinct repo from run_jobs;
 select
   runner,
   count(*) as '# jobs',
-  round(sum(epoch(completed_at - started_at)) / 60, 2) as 'total runtime (minutes)',
+  round(sum(epoch(completed_at - started_at)) / 60, 0) as 'total runtime (minutes)',
   round("total runtime (minutes)" / "# jobs", 2) as 'avg runtime'
 from run_jobs
 where completed_at > started_at
@@ -103,7 +103,7 @@ order by runner;
 select
   repo as 'repository',
   count(*) as '# jobs',
-  round(sum(epoch(completed_at - started_at)) / 60, 2) as 'total runtime (minutes)',
+  round(sum(epoch(completed_at - started_at)) / 60, 0) as 'total runtime (minutes)',
   round("total runtime (minutes)" / "# jobs", 2) as 'avg runtime'
 from run_jobs
 where completed_at > started_at
@@ -128,7 +128,7 @@ order by repo;
 select
   event,
   count(*) as '# jobs',
-  round(sum(epoch(completed_at - started_at)) / 60, 2) as 'total runtime (minutes)',
+  round(sum(epoch(completed_at - started_at)) / 60, 0) as 'total runtime (minutes)',
   round("total runtime (minutes)" / "# jobs", 2) as 'avg runtime'
 from run_jobs
 where completed_at > started_at
@@ -153,7 +153,7 @@ order by event;
 select
   workflow_name,
   count(*) as '# jobs',
-  round(sum(epoch(completed_at - started_at)) / 60, 2) as 'total runtime (minutes)',
+  round(sum(epoch(completed_at - started_at)) / 60, 0) as 'total runtime (minutes)',
   round("total runtime (minutes)" / "# jobs", 2) as 'avg runtime'
 from run_jobs
 where completed_at > started_at
@@ -178,7 +178,7 @@ order by workflow_name;
 select
   job_name[:60] as job_name,
   count(*) as '# jobs',
-  round(sum(epoch(completed_at - started_at)) / 60, 2) as 'total runtime (minutes)',
+  round(sum(epoch(completed_at - started_at)) / 60, 0) as 'total runtime (minutes)',
   round("total runtime (minutes)" / "# jobs", 2) as 'avg runtime'
 from run_jobs
 where completed_at > started_at
