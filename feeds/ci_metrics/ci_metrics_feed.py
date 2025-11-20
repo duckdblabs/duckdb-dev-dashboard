@@ -35,9 +35,10 @@ def run():
         update_runs(repo_name, rate_limits_runs)
 
     print(f"===============\nupdating ci jobs")
-    rate_limits_jobs = RepoRatelimits(repo_names)
-    for repo_name in repo_names:
-        update_jobs(repo_name, rate_limits_jobs)
+    print("-- updating ci jobs temporarily disabled --")
+    # rate_limits_jobs = RepoRatelimits(repo_names)
+    # for repo_name in repo_names:
+    #     update_jobs(repo_name, rate_limits_jobs)
 
 
 def update_workflows(github_repo):
