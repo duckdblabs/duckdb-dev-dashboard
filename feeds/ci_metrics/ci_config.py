@@ -18,4 +18,4 @@ GITHUB_RATE_LIMITING_FACTOR = 0.80  # use max 80% of available rate limit
 GITHUB_RUNS_STALE_DELAY: int | None = 48
 
 # after this number of DAYS, we stop trying to fetch jobs for this run
-GITHUB_RUNS_JOB_CUTOFF: int | None = None
+GITHUB_RUNS_JOB_CUTOFF: int | None = 30
