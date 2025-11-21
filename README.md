@@ -72,7 +72,7 @@ Therfore (for now) there are 2 build steps:
 
 Steps to define a new source:
 - initial step to create a new source, see: https://docs.evidence.dev/core-concepts/data-sources/duckdb/
-    - run `make dev` to spawn the front-end
+    - run `make dev` to spawn the front-end (make sure evidence is installed locally, see [./evidence/README.md](/evidence/README.md))
     - following the steps in the link above will create a subdirectory under `./evidence/sources`
 - add the source to `evidence/sources/sources.json`, to specify which tables from the ducklake are needed.
 - run `make generate_sources`, this should create the `.duckdb` file (which is .gitignored, but needed for local testing).

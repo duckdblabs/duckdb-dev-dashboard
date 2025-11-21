@@ -2,7 +2,7 @@ import os
 import requests
 
 
-def gh_api_request(url, headers = {"Accept": "application/vnd.github+json"}, params=None) -> dict:
+def gh_api_request(url, headers={"Accept": "application/vnd.github+json"}, params=None):
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
     if GITHUB_TOKEN:
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
@@ -21,15 +21,19 @@ def get_rate_limit():
     return rate_limit
 
 
-def fetch_repo_names(organisation: str) -> list[str]:
-    url = f"https://api.github.com/orgs/{organisation}/repos"
-    per_page = 100  # max value for github api
-    page = 1
+def fetch_github_records(endpoint: str, start_page=1, per_page=100) -> list[dict]:
+    """
+    This function can be used to fetch all paginated data records from a github endpoint
+    The records are expected to be directly in the root of the response (returned as a list)
+    e.g. https://api.github.com/orgs/duckdb/repos
+    """
+    page = start_page
     repos = []
     while True:
         params = {"per_page": per_page, "page": page}
-        resp = gh_api_request(url, params=params)
-        repos.extend(repo['full_name'] for repo in resp)
+        resp = gh_api_request(endpoint, params=params)
+        assert isinstance(resp, list)
+        repos.extend(resp)
         if len(resp) < per_page:
             break
         page += 1

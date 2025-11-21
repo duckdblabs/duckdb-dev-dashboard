@@ -6,13 +6,13 @@ from .ci_config import *
 
 
 class RepoRatelimits:
-    # repo 'duckdb/duckdb' gets 50% of the rate limit
+    # repo 'duckdb/duckdb' gets 10% of the rate limit
     # other repos equally share the remainder
     def __init__(self, repo_names):
         nr_other_repos = len(repo_names) - 1 if DUCKDB_REPO in repo_names else len(repo_names)
         self.total = int(get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR)
         if DUCKDB_REPO in repo_names:
-            self.duckdb = int(self.total * 0.5) if nr_other_repos > 0 else self.total
+            self.duckdb = int(self.total * 0.1) if nr_other_repos > 0 else self.total
         else:
             self.duckdb = 0
         self.non_duckdb = int((self.total - self.duckdb) / nr_other_repos) if nr_other_repos > 0 else 0
