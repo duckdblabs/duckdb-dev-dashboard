@@ -81,26 +81,28 @@ class DuckLakeConnection:
         with tempfile.NamedTemporaryFile(mode='w+', suffix=".json") as tmp:
             tmp.write(json_str)
             tmp.flush()
-            subquery = f"select * from read_json('{tmp.name}')"
-            match_str = " and ".join([f"{table_name}.{attr} = upserts.{attr}" for attr in match_columns])
-            self.execute(
-                f"""
-                merge into {table_name}
-                using ({subquery}) as upserts
-                on ({match_str})
-                when matched then update
-                when not matched then insert;
-                """
-            )
-        if print_changes:
-            # NOTE: we assume a new snapshot is created after every 'merge into', even if there are no changes, see: https://github.com/duckdblabs/duckdb-internal/issues/6557
-            current_snapshot = self.current_snapshot()
-            rel = self.table_changes(table_name, current_snapshot, current_snapshot)
-            if rel.fetchone():
-                print(f"new or updated records in {table_name}:")
-                rel.show()
+            # work-around: use EXCEPT to find new or updated records, to prevent unnecessary snapshots
+            # see: https://github.com/duckdblabs/duckdb-internal/issues/6557
+            subquery = f"select * from read_json('{tmp.name}') EXCEPT select * from {table_name}"
+            nr_new_or_updated: int = self.sql(f"select count(*) from ({subquery})").fetchone()[0]
+            if nr_new_or_updated > 0:
+                if print_changes:
+                    print(f"new or updated records in {table_name}:")
+                    self.sql(subquery).show()
+                # upsert
+                match_str = " and ".join([f"{table_name}.{attr} = upserts.{attr}" for attr in match_columns])
+                self.execute(
+                    f"""
+                    merge into {table_name}
+                    using ({subquery}) as upserts
+                    on ({match_str})
+                    when matched then update
+                    when not matched then insert;
+                    """
+                )
             else:
-                print('no updates')
+                if print_changes:
+                    print('no updates')
 
     def current_snapshot(self) -> int:
         return self.con.sql(f"from {self.ducklake_db_alias}.current_snapshot()").fetchone()[0]
