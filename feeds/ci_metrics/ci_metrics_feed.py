@@ -28,9 +28,7 @@ def run():
         update_all_workflows(repo_names, con)
 
     print(f"===============\nupdating ci runs")
-    rate_limits_runs = RepoRatelimits(repo_names)
-    for repo_name in repo_names:
-        update_runs(repo_name, rate_limits_runs)
+    update_all_runs(repo_names)
 
     print(f"===============\nupdating ci jobs")
     rate_limits_jobs = RepoRatelimits(repo_names)
@@ -73,26 +71,37 @@ def update_all_workflows(github_repos: list[str], con: DuckLakeConnection):
         print(f"no workflows found")
 
 
-def update_runs(github_repo: str, rate_limits: RepoRatelimits):
-    print(f"updating workflow runs for: {github_repo}")
-    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
-    rate_limit = rate_limits.get_repo_rate_limit(github_repo)
-    if rate_limit == 0:
-        print("skipping - rate limit 0")
-        return
+def update_all_runs(github_repos: list[str]):
+    # get ducklake state
     with DuckLakeConnection() as con:
-        if not con.table_exists(GITHUB_RUNS_TABLE):
-            create_table = True
-            latest_previously_stored = None
-        else:
+        if con.table_exists(GITHUB_RUNS_TABLE):
             if con.table_empty(GITHUB_RUNS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
             create_table = False
-            con.execute(f"select max(id) from {GITHUB_RUNS_TABLE} where repository['full_name'] = ?", [github_repo])
-            latest_previously_stored = con.fetchone()[0]
-    runs = fetch_github_actions_runs(rate_limit, github_repo, latest_previously_stored)
-    if runs:
-        store_runs(runs, create_table, latest_previously_stored)
+        else:
+            create_table = True
+        # fetch previous max run id per repo from ducklake
+        query = f"""
+        SELECT
+          repos.full_name,
+          max(runs.id)
+        FROM {GITHUB_REPOS_TABLE} repos
+          LEFT JOIN {GITHUB_RUNS_TABLE} runs on runs.repository['id'] = repos.id
+        GROUP BY repos.full_name
+        ORDER BY repos.full_name
+        """
+        res = con.sql(query).fetchall()
+        repo_max_run_id = {tup[0]: tup[1] for tup in res}
+
+    # fetch from gh api store in ducklake
+    rate_limits = RepoRatelimits(github_repos)
+    for github_repo in github_repos:
+        rate_limit = rate_limits.get_repo_rate_limit(github_repo)
+        assert github_repo in repo_max_run_id
+        runs = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id[github_repo])
+        if runs:
+            store_runs(runs, create_table, repo_max_run_id[github_repo])
+        create_table = False
 
 
 def update_jobs(github_repo, rate_limits: RepoRatelimits):
