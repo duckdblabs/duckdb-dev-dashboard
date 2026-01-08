@@ -98,6 +98,7 @@ def update_all_runs(github_repos: list[str]):
     for github_repo in github_repos:
         rate_limit = rate_limits.get_repo_rate_limit(github_repo)
         assert github_repo in repo_max_run_id
+        print(f"current max(id) for {github_repo} in {GITHUB_RUNS_TABLE}: {repo_max_run_id[github_repo]}")
         runs = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id[github_repo])
         if runs:
             store_runs(runs, create_table, repo_max_run_id[github_repo])
