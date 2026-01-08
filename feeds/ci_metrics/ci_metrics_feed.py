@@ -24,10 +24,8 @@ def run():
     with DuckLakeConnection() as con:
         print(f"===============\nupdating repositories")
         repo_names = update_repositories(con)
-
         print(f"===============\nupdating ci workflows")
-        for repo_name in repo_names:
-            update_workflows(repo_name, con)
+        update_all_workflows(repo_names, con)
 
     print(f"===============\nupdating ci runs")
     rate_limits_runs = RepoRatelimits(repo_names)
@@ -52,20 +50,25 @@ def update_repositories(con: DuckLakeConnection) -> list[str]:
     return repo_names
 
 
-def update_workflows(github_repo: str, con: DuckLakeConnection):
-    print(f"updating workflows for: {github_repo}")
-    assert re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo), "regex not matched"  # format: 'org/repo_name'
-    endpoint = GITHUB_WORKFLOWS_ENDPOINT.format(GITHUB_REPO=github_repo)
-    _, workflows = fetch_github_record_list(endpoint, 'workflows', detail_log=True)
-    if workflows:
+def update_all_workflows(github_repos: list[str], con: DuckLakeConnection):
+    all_workflows = []
+    for github_repo in github_repos:
+        assert re.fullmatch(
+            r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repo
+        ), f"invalid org/repo_name: '{github_repo}'"  # format: 'org/repo_name'
+        endpoint = GITHUB_WORKFLOWS_ENDPOINT.format(GITHUB_REPO=github_repo)
+        _, workflows = fetch_github_record_list(endpoint, 'workflows', detail_log=True)
         for workflow in workflows:
             workflow['repository'] = github_repo
+        all_workflows.extend(workflows)
+    if all_workflows:
         if con.table_exists(GITHUB_WORKFLOWS_TABLE):
             if con.table_empty(GITHUB_WORKFLOWS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_WORKFLOWS_TABLE} should not be empty")
-            con.upsert_table(GITHUB_WORKFLOWS_TABLE, workflows, ['id', 'repository'], True)
+            print(f"upserting into {GITHUB_WORKFLOWS_TABLE}")
+            con.upsert_table(GITHUB_WORKFLOWS_TABLE, all_workflows, ['id', 'repository'], True)
         else:
-            con.create_table(GITHUB_WORKFLOWS_TABLE, workflows)
+            con.create_table(GITHUB_WORKFLOWS_TABLE, all_workflows)
     else:
         print(f"no workflows found")
 
