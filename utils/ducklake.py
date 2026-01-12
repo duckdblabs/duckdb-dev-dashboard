@@ -35,7 +35,7 @@ class DuckLakeConnection:
         ).fetchone() == (1,)
 
     def table_empty(self, table_name: str) -> bool:
-        return self.con.sql(f"select count(*) from {table_name}").fetchone() == (0,)
+        return self.con.sql(f"select 1 from \"{table_name}\" limit 1").fetchone() != (1,)
 
     def max_id(self, table_name: str):
         return self.con.sql(f"select max(id) from {table_name}").fetchone()[0]
