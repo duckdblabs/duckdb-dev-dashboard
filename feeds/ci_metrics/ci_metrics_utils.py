@@ -21,96 +21,6 @@ class RepoRatelimits:
         return self.duckdb if github_repo == DUCKDB_REPO else self.non_duckdb
 
 
-def get_jobs_table_state(con: DuckLakeConnection, github_repo: str) -> tuple[bool, bool]:
-    if not con.table_exists(GITHUB_JOBS_TABLE):
-        create_table = True
-        is_first_run = True
-    else:
-        create_table = False
-        is_first_run: bool = con.sql(
-            f"""
-            select not exists (
-              select 1
-              from {GITHUB_JOBS_TABLE}
-              join {GITHUB_RUNS_TABLE} on {GITHUB_JOBS_TABLE}.run_id = {GITHUB_RUNS_TABLE}.id
-              where {GITHUB_RUNS_TABLE}.repository['full_name'] == '{github_repo}'
-            );
-            """
-        ).fetchone()[0]
-    return (create_table, is_first_run)
-
-
-def get_run_ids_count(con: DuckLakeConnection, github_repo: str) -> int:
-    con.execute(
-        f"""
-        select count(*)
-        from {GITHUB_RUNS_TABLE} runs
-        where runs.status='completed'
-        and runs.repository['full_name'] = ?
-        """,
-        [github_repo],
-    )
-    return con.fetchone()[0]
-
-
-def get_recent_run_ids_without_jobs_count(
-    con: DuckLakeConnection, github_repo: str, max_age: int | None = GITHUB_RUNS_JOB_CUTOFF
-) -> int:
-    # Note: max_age age can be set to to filter out stale runs.
-    stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
-    con.execute(
-        f"""
-        select count(*)
-        from {GITHUB_RUNS_TABLE} runs
-        left join {GITHUB_JOBS_TABLE} jobs on runs.id = jobs.run_id
-        where jobs.run_id is NULL
-        and runs.status='completed'
-        {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
-        and runs.repository['full_name'] = ?
-        """,
-        [github_repo],
-    )
-    return con.fetchone()[0]
-
-
-def get_run_ids(con: DuckLakeConnection, github_repo: str, limit: int | None = None) -> list[int]:
-    con.execute(
-        f"""
-        select runs.id
-        from {GITHUB_RUNS_TABLE} runs
-        where runs.status='completed'
-        and runs.repository['full_name'] = ?
-        order by runs.id ASC
-        {f"limit {limit}" if limit else ''}
-        """,
-        [github_repo],
-    )
-    return con.fetchall()
-
-
-# fetch the runs for which the jobs are still missing
-def get_recent_run_ids_without_jobs(
-    con: DuckLakeConnection, github_repo: str, limit: int | None = None, max_age: int | None = GITHUB_RUNS_JOB_CUTOFF
-) -> list[int]:
-    # Note: max_age age can be set to to filter out stale runs.
-    stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
-    con.execute(
-        f"""
-        select runs.id
-        from {GITHUB_RUNS_TABLE} runs
-        left join {GITHUB_JOBS_TABLE} jobs on runs.id = jobs.run_id
-        where jobs.run_id is NULL
-        and runs.status='completed'
-        {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
-        and runs.repository['full_name'] = ?
-        order by runs.id ASC
-        {f"limit {limit}" if limit else ''}
-        """,
-        [github_repo],
-    )
-    return con.fetchall()
-
-
 def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previously_stored: int | None = None) -> list:
     endpoint = GITHUB_RUNS_ENDPOINT.format(GITHUB_REPO=github_repo)
     page = 1
@@ -138,3 +48,34 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
         page += 1
     print(f"fetched {len(fetched_workflow_runs)} runs")
     return fetched_workflow_runs
+
+
+def get_recent_run_ids_without_jobs(con: DuckLakeConnection) -> dict[str, list]:
+    max_age: int | None = GITHUB_RUNS_STALE_DELAY
+    stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
+    print(f"fetching runs {f"(created after {stale_timestamp})" if stale_timestamp else ''} without jobs ...", flush=True)
+
+    # fetch recent runs without jobs
+    con.execute(f"""
+    CREATE OR REPLACE TEMPORARY TABLE recent_runs_without_jobs AS
+      SELECT runs.repository['id'] repo_id, runs.id run_id
+      FROM {GITHUB_RUNS_TABLE} runs
+        ANTI JOIN {GITHUB_JOBS_TABLE} jobs ON runs.id = jobs.run_id
+      WHERE runs.status='completed'
+        {f"and runs.updated_at > TIMESTAMP '{stale_timestamp}'" if stale_timestamp else ''}
+      ORDER BY run_id ASC
+    ;
+    """)
+    # group by repository
+    res = con.sql(f"""
+    SELECT
+      repos.full_name,
+      list_sort(list(selected_runs.run_id))
+    FROM {GITHUB_REPOS_TABLE} repos
+      LEFT JOIN recent_runs_without_jobs selected_runs
+      ON selected_runs.repo_id = repos.id
+    GROUP BY repos.full_name;
+    """
+    ).fetchall()
+    repo_jobs: dict[str, list] = {tup[0]: (tup[1] if tup[1] != [None] else []) for tup in res}
+    return repo_jobs
