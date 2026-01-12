@@ -51,7 +51,7 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
 
 
 def get_recent_run_ids_without_jobs(con: DuckLakeConnection) -> dict[str, list]:
-    max_age: int | None = GITHUB_RUNS_STALE_DELAY
+    max_age: int | None = GITHUB_RUNS_JOB_CUTOFF
     stale_timestamp = (datetime.now() - timedelta(days=max_age)).strftime("%Y-%m-%d %H:%M:%S") if max_age else None
     print(f"fetching runs {f"(created after {stale_timestamp})" if stale_timestamp else ''} without jobs ...", flush=True)
 
