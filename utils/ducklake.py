@@ -24,6 +24,11 @@ class DuckLakeConnection:
     def execute(self, sql_str, parameters=None):
         return self.con.execute(sql_str, parameters)
 
+    def execute_transaction(self, sql_statments: list[str], parameters=None):
+        sql_statments = [stmnt + ";" if stmnt[-1] != ';' else stmnt for stmnt in sql_statments]
+        sql_str = "BEGIN TRANSACTION;" + "".join(sql_statments) + "COMMIT;"
+        return self.con.execute(sql_str, parameters)
+
     def fetchone(self):
         return self.con.fetchone()
 
