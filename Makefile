@@ -1,4 +1,4 @@
-.PHONY: all secrets run_feeds generate_sources build dev venv
+.PHONY: all secrets run_feeds merge_adjacent_files generate_sources build dev venv
 
 all: run_feeds generate_sources build
 
@@ -9,6 +9,9 @@ secrets:
 # run feeds to update the ducklake
 run_feeds:
 	python3 -m feeds.run_feeds
+
+merge_adjacent_files:
+	duckdb -f utils/maintainance.sql
 
 # generates duckdb files from ducklake (required by evidence)
 generate_sources:

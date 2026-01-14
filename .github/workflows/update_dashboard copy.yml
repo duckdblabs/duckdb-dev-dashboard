@@ -1,0 +1,36 @@
+name: Maintain Dashboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 3'
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ducklake storage credentials (also use for cloudflare):
+  DUCKLAKE_STORAGE_S3_KEY_ID: ${{ secrets.DUCKLAKE_STORAGE_S3_KEY_ID }}
+  DUCKLAKE_STORAGE_S3_SECRET: ${{ secrets.DUCKLAKE_STORAGE_S3_SECRET }}
+  DUCKLAKE_STORAGE_S3_ENDPOINT: ${{ secrets.DUCKLAKE_STORAGE_S3_ENDPOINT }}
+  DUCKLAKE_STORAGE_R2_ACCOUNT_ID: ${{ secrets.DUCKLAKE_STORAGE_R2_ACCOUNT_ID }}
+
+  # ducklake catalog credentials:
+  DUCKLAKE_CATALOG_PG_HOST: ${{ secrets.DUCKLAKE_CATALOG_PG_HOST }}
+  DUCKLAKE_CATALOG_PG_USER: ${{ secrets.DUCKLAKE_CATALOG_PG_USER }}
+  DUCKLAKE_CATALOG_PG_PASSWORD: ${{ secrets.DUCKLAKE_CATALOG_PG_PASSWORD }}
+
+  # aws s3 credentials
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  maintain-ducklake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Update DuckLake
+        run: |
+          python3 -m pip install -r requirements.txt
+          make secrets
+          make merge_adjacent_files
