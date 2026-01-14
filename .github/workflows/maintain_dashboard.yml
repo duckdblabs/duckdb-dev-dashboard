@@ -32,6 +32,7 @@ jobs:
       - name: Update DuckLake
         run: |
           curl https://install.duckdb.org | sh
+          export PATH='/home/runner/.duckdb/cli/latest':$PATH
           python3 -m pip install -r requirements.txt
           make secrets
           make merge_adjacent_files
