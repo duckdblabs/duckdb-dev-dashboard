@@ -7,6 +7,7 @@ import tempfile
 class DuckLakeConnection:
     def __init__(self):
         self.ducklake_db_alias = 'my_ducklake'
+        self.catalog = f"__ducklake_metadata_{self.ducklake_db_alias}"
 
     def __enter__(self):
         self.con = duckdb.connect()
@@ -21,6 +22,11 @@ class DuckLakeConnection:
         return self.con.sql(sql_str)
 
     def execute(self, sql_str, parameters=None):
+        return self.con.execute(sql_str, parameters)
+
+    def execute_transaction(self, sql_statments: list[str], parameters=None):
+        sql_statments = [stmnt + ";" if stmnt[-1] != ';' else stmnt for stmnt in sql_statments]
+        sql_str = "BEGIN TRANSACTION;" + "".join(sql_statments) + "COMMIT;"
         return self.con.execute(sql_str, parameters)
 
     def fetchone(self):
@@ -40,13 +46,30 @@ class DuckLakeConnection:
     def max_id(self, table_name: str):
         return self.con.sql(f"select max(id) from {table_name}").fetchone()[0]
 
+    def from_table_column_stats(self, table_name: str, column_name: str, stat: str, cast_to: str = None):
+        assert stat in ['min_value', 'max_value', 'contains_nan', 'extra_stats']
+        cast_str = "::" + cast_to if cast_to else ''
+        return self.con.sql(
+            f"""
+            select
+              ducklake_table_column_stats.{stat}{cast_str}
+            from {self.catalog}.ducklake_table_column_stats
+              join {self.catalog}.ducklake_table using (table_id)
+              join {self.catalog}.ducklake_column using (table_id, column_id)
+            where ducklake_table.table_name = '{table_name}'
+              and ducklake_table.end_snapshot is null
+              and ducklake_column.column_name = '{column_name}'
+              and ducklake_column.parent_column is null;
+            """
+        ).fetchone()[0]
+
     def create_table(
         self,
         table_name: str,
         records: list[OrderedDict],
         or_replace: bool = False,
         if_not_exists: bool = False,
-        with_no_data: bool =False,
+        with_no_data: bool = False,
     ):
         json_str = f"[{',\n'.join([json.dumps(rec) for rec in records])}]"
         # work-around: use temp-file to utilize the type-sniffer

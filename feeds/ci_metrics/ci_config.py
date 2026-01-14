@@ -3,6 +3,7 @@ DUCKDB_REPO = "duckdb/duckdb"
 
 # ducklake table names
 GITHUB_REPOS_TABLE = "ci_repositories"
+GITHUB_REPOS_METADATA_TABLE = "ci_repositories_metadata"
 GITHUB_WORKFLOWS_TABLE = "ci_workflows"
 GITHUB_RUNS_TABLE = "ci_runs"
 GITHUB_JOBS_TABLE = "ci_jobs"

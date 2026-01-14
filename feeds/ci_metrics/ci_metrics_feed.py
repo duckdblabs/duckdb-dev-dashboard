@@ -70,28 +70,30 @@ def update_runs(github_repos: list[str]):
             create_table = False
         else:
             create_table = True
-        # fetch previous max run id per repo from ducklake
+        # fetch previous max_run_id per repo from the metadata in the ducklake
         query = f"""
         SELECT
           repos.full_name,
-          max(runs.id)
+          repos.id,
+          meta.max_run_id
         FROM {GITHUB_REPOS_TABLE} repos
-          LEFT JOIN {GITHUB_RUNS_TABLE} runs on runs.repository['id'] = repos.id
-        GROUP BY repos.full_name
+          LEFT JOIN {GITHUB_REPOS_METADATA_TABLE} meta on meta.repository_id = repos.id
         ORDER BY repos.full_name
         """
         res = con.sql(query).fetchall()
-        repo_max_run_id = {tup[0]: tup[1] for tup in res}
+        repos_max_run_id = {tup[0]: (tup[1], tup[2]) for tup in res}
 
     # fetch from gh api store in ducklake
     rate_limits = RepoRatelimits(github_repos)
     for github_repo in github_repos:
         rate_limit = rate_limits.get_repo_rate_limit(github_repo)
-        assert github_repo in repo_max_run_id
-        print(f"current max(id) for {github_repo} in {GITHUB_RUNS_TABLE}: {repo_max_run_id[github_repo]}")
-        runs = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id[github_repo])
+        assert github_repo in repos_max_run_id
+        repo_id = repos_max_run_id[github_repo][0]
+        repo_max_run_id = repos_max_run_id[github_repo][1]
+        print(f"current max(id) for {github_repo} in {GITHUB_RUNS_TABLE}: {repo_max_run_id}")
+        runs = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id)
         if runs:
-            store_runs(runs, create_table, repo_max_run_id[github_repo])
+            store_runs(runs, create_table, repo_id, repo_max_run_id)
         create_table = False
 
 
@@ -142,7 +144,7 @@ def update_jobs(github_repos: list[str]):
             create_table = False
 
 
-def store_runs(runs, create_table, latest_previously_stored, max_age: int | None = GITHUB_RUNS_STALE_DELAY):
+def store_runs(runs, create_table, repo_id, latest_previously_stored, max_age: int | None = GITHUB_RUNS_STALE_DELAY):
     runs_str = f"[{',\n'.join([json.dumps(r) for r in runs])}]"
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".json") as tmp:
         tmp.write(runs_str)
@@ -166,13 +168,24 @@ def store_runs(runs, create_table, latest_previously_stored, max_age: int | None
                         {f"and id > {latest_previously_stored}" if latest_previously_stored else ''}
                         )
                         """
-            if not con.sql(f"from {subquery} limit 1").fetchone():
+            if not con.sql(f"select 1 from {subquery} limit 1").fetchone():
                 print("no new runs to store")
                 return
+
+            # update runs and metadata in a transaction:
+            new_max_run_id = con.sql(f"select max(id) from ({subquery})").fetchone()[0]
             if create_table:
-                con.execute(f"create table {GITHUB_RUNS_TABLE} as {subquery}")
+                q_store_runs = f"create table {GITHUB_RUNS_TABLE} as {subquery}"
             else:
-                con.execute(f"insert into {GITHUB_RUNS_TABLE} {subquery}")
+                q_store_runs = f"insert into {GITHUB_RUNS_TABLE} {subquery}"
+            q_update_metadata = f"""
+                                 MERGE INTO {GITHUB_REPOS_METADATA_TABLE}
+                                 USING (select {repo_id} repository_id, {new_max_run_id} max_run_id) as upserts
+                                 ON upserts.repository_id = {GITHUB_REPOS_METADATA_TABLE}.repository_id
+                                 WHEN MATCHED THEN UPDATE
+                                 WHEN NOT MATCHED THEN INSERT
+                                 """
+            con.execute_transaction([q_store_runs, q_update_metadata])
             print('stored runs:')
             con.sql(f"select id, created_at, status, html_url, '...' as 'more ...' from {subquery} order by id").show()
 
