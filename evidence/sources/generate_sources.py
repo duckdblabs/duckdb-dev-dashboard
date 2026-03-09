@@ -23,7 +23,7 @@ def main():
     with DuckLakeConnection() as con:
         for source in sources:
             print(f"---\ngenerating sources for data-feed: {source['name']} ...")
-            con.execute(f"ATTACH '{source['db_path']}' AS {source['name']};")
+            con.execute(f"ATTACH '{source['db_path']}' AS {source['name']} (AUTOMATIC_MIGRATION);")
             for table in source["tables"]:
                 if con.table_exists(table):
                     con.execute(f"CREATE OR REPLACE TABLE {source['name']}.main.{table} AS FROM {table};")
