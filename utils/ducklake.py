@@ -11,7 +11,7 @@ class DuckLakeConnection:
 
     def __enter__(self):
         self.con = duckdb.connect()
-        self.con.execute(f"ATTACH 'ducklake:ducklake_secret' AS {self.ducklake_db_alias}")
+        self.con.execute(f"ATTACH 'ducklake:ducklake_secret' AS {self.ducklake_db_alias} (AUTOMATIC_MIGRATION)")
         self.con.execute(f"USE {self.ducklake_db_alias}")
         return self
 
