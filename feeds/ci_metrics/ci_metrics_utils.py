@@ -33,7 +33,7 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
                 print(f"rate limit ({rate_limit}) hit!")
             else:
                 print(
-                    f"WARNING: rate limit ({rate_limit}) hit, but connecting run id not found. Storing nothing to prevent gaps"
+                    f"::warning title=WARNING: runs for repo '{github_repo}' not updated!::rate limit ({rate_limit}) hit, but connecting run id not found. Storing nothing to prevent gaps"
                 )
                 fetched_workflow_runs = []
             break
