@@ -24,8 +24,8 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   # cloudflare (same as ducklake storage)
-  CF_KEY_ID: ${{ secrets.DUCKLAKE_STORAGE_S3_KEY_ID }}
-  CF_KEY_SECRET: ${{ secrets.DUCKLAKE_STORAGE_S3_SECRET }}
+  CF_KEY_ID: ${{ secrets.CF_KEY_ID }}
+  CF_KEY_SECRET: ${{ secrets.CF_KEY_SECRET }}
 
 jobs:
   update-ducklake:
