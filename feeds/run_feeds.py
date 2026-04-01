@@ -5,7 +5,7 @@ import feeds.extension_downloads.extension_downloads_feed as extension_downloads
 
 
 FEEDS = [
-    ("ci_metrics_feed", ci_metrics_feed.run),
+    # ("ci_metrics_feed", ci_metrics_feed.run),
     ("extension_downloads_feed", extension_downloads_feed.run),
 ]
 
