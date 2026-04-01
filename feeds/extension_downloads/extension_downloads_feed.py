@@ -2,15 +2,19 @@ import boto3
 from botocore.exceptions import ClientError
 from collections import OrderedDict
 import json
+import os
 import re
 
 from utils.ducklake import DuckLakeConnection
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 EXTENSION_DOWNLOADS_TABLE = 'extension_downloads'
 
-S3_BUCKET = 'duckdb-extensions'
+S3_BUCKET = 'duckdb-core-extensions'
 S3_BUCKET_DIR = 'download-stats-weekly'
-
 
 def run():
     # fetch periods already stored in ducklake
@@ -20,9 +24,18 @@ def run():
         else:
             periods_in_ducklake = []
 
+    # r2 credentials
+    r2_account_id = os.getenv('DUCKLAKE_STORAGE_R2_ACCOUNT_ID')
+    s3_client = boto3.client(
+        service_name="s3",
+        endpoint_url = f"https://{r2_account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id = os.getenv('CF_KEY_ID'),
+        aws_secret_access_key = os.getenv('CF_KEY_SECRET'),
+        region_name="auto" # Required by SDK but not used by R2
+    )
+
     # fetch download stats for new periods from s3
     new_records = []
-    s3_client = boto3.client('s3')
     s3_file_paths = get_s3_file_paths(s3_client)
     for file_path in s3_file_paths:
         iso_year_str, _, iso_week_str = file_path.removeprefix(f'{S3_BUCKET_DIR}/').removesuffix('.json').partition('/')
