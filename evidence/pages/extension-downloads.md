@@ -14,6 +14,7 @@ title: Extension Downloads
 </Dropdown>
 
 <Dropdown name=year>
+    <DropdownOption value=2026/>
     <DropdownOption value=2025/>
     <DropdownOption value=2024/>
 </Dropdown>
