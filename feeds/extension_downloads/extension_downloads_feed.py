@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-EXTENSION_DOWNLOADS_TABLE = 'extension_downloads'
+EXTENSION_TABLE = 'extensions'
 
 S3_BUCKET = 'duckdb-core-extensions'
 S3_BUCKET_DIR = 'download-stats-weekly'
@@ -19,6 +19,10 @@ S3_BUCKET_DIR = 'download-stats-weekly'
 def run():
     # fetch periods already stored in ducklake
     with DuckLakeConnection() as con:
+        if con.table_exists(EXTENSION_TABLE):
+            extensions_in_ducklake = {tup[0] for tup in con.sql(f"select name from {EXTENSION_TABLE}").fetchall()}
+        else:
+            extensions_in_ducklake = set()
         if con.table_exists(EXTENSION_DOWNLOADS_TABLE):
             periods_in_ducklake = con.sql(f"select distinct year, week from {EXTENSION_DOWNLOADS_TABLE}").fetchall()
         else:
@@ -47,6 +51,7 @@ def run():
         if year_week_file not in periods_in_ducklake:
             print(f"fetching data from {file_path}...")
             new_records.extend(get_download_stats_from_file(s3_client, file_path))
+    new_extensions: set = {rec['extension_name'] for rec in new_records}.difference(extensions_in_ducklake)
 
     # update ducklake
     if new_records:
@@ -63,8 +68,23 @@ def run():
                     )
                 """
             )
+            con.execute(
+                f"""
+                CREATE TABLE
+                    IF NOT EXISTS {EXTENSION_TABLE} (
+                        name VARCHAR,
+                        repository VARCHAR,
+                    )
+                """
+            )
             con.append_table(EXTENSION_DOWNLOADS_TABLE, new_records)
             print(f"inserted {len(new_records)} records to table '{EXTENSION_DOWNLOADS_TABLE}'.")
+            if new_extensions:
+                con.append_table(EXTENSION_TABLE, [OrderedDict(
+                    name=extension_name,
+                    repository='core',
+                ) for extension_name in new_extensions])
+                print(f"added new extensions: [{", ".join(new_extensions)}]")
     else:
         print("no new extension stats to store")
 
