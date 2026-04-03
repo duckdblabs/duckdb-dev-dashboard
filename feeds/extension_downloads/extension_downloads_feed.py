@@ -11,82 +11,78 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-EXTENSION_TABLE = 'extensions'
+EXTENSION_DOWNLOADS_TABLE = 'extension_downloads'
 
-S3_BUCKET = 'duckdb-core-extensions'
+S3_BUCKET_CORE = 'duckdb-core-extensions'
+S3_BUCKET_COMMUNITY = 'duckdb-community-extensions'
 S3_BUCKET_DIR = 'download-stats-weekly'
 
-def run():
-    # fetch periods already stored in ducklake
-    with DuckLakeConnection() as con:
-        if con.table_exists(EXTENSION_TABLE):
-            extensions_in_ducklake = {tup[0] for tup in con.sql(f"select name from {EXTENSION_TABLE}").fetchall()}
-        else:
-            extensions_in_ducklake = set()
-        if con.table_exists(EXTENSION_DOWNLOADS_TABLE):
-            periods_in_ducklake = con.sql(f"select distinct year, week from {EXTENSION_DOWNLOADS_TABLE}").fetchall()
-        else:
-            periods_in_ducklake = []
 
-    # r2 credentials
+def run():
+    s3_client = get_s3_client()
+
+    # fetch periods and extension names already stored in ducklake
+    with DuckLakeConnection() as con:
+        create_tables_if_not_exists(con)
+        periods_in_ducklake = con.sql(f"select distinct year, week from {EXTENSION_DOWNLOADS_TABLE}").fetchall()
+
+        for bucket in (S3_BUCKET_CORE, S3_BUCKET_COMMUNITY):
+            if bucket == S3_BUCKET_CORE:
+                repository = 'core'
+            elif bucket == S3_BUCKET_COMMUNITY:
+                repository = 'community'
+            else:
+                raise ValueError(f"undefined repository name for extension bucket: {bucket}")
+
+            # fetch download stats for new periods from s3
+            new_records = []
+            s3_file_paths = get_s3_file_paths(s3_client, bucket)
+            for file_path in s3_file_paths:
+                iso_year_str, _, iso_week_str = (
+                    file_path.removeprefix(f'{S3_BUCKET_DIR}/').removesuffix('.json').partition('/')
+                )
+                if not is_valid_iso_year(iso_year_str) or not is_valid_iso_week(iso_week_str):
+                    raise ValueError(
+                        f"invalid file path: '{file_path}'; expected: '{S3_BUCKET_DIR}/<iso_year>/<iso_week>.json'"
+                    )
+                year_week_file = (int(iso_year_str), int(iso_week_str))
+                if year_week_file not in periods_in_ducklake:
+                    new_records.extend(get_download_stats_from_file(s3_client, bucket, file_path, repository))
+
+            # update ducklake
+            if new_records:
+                con.append_table(EXTENSION_DOWNLOADS_TABLE, new_records)
+                print(f"repo {repository}: inserted {len(new_records)} records to table '{EXTENSION_DOWNLOADS_TABLE}'.")
+            else:
+                print(f"repo {repository}: no new extension stats to store")
+
+
+def create_tables_if_not_exists(con: DuckLakeConnection):
+    con.execute(
+        f"""
+        CREATE TABLE
+            IF NOT EXISTS {EXTENSION_DOWNLOADS_TABLE} (
+                year USMALLINT,
+                week UTINYINT,
+                extension_name VARCHAR,
+                downloads UINTEGER,
+                last_update TIMESTAMP_S,
+                repository VARCHAR,
+            )
+        """
+    )
+
+
+def get_s3_client():
     r2_account_id = os.getenv('DUCKLAKE_STORAGE_R2_ACCOUNT_ID')
     s3_client = boto3.client(
         service_name="s3",
-        endpoint_url = f"https://{r2_account_id}.r2.cloudflarestorage.com",
-        aws_access_key_id = os.getenv('CF_KEY_ID'),
-        aws_secret_access_key = os.getenv('CF_KEY_SECRET'),
-        region_name="auto" # Required by SDK but not used by R2
+        endpoint_url=f"https://{r2_account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=os.getenv('CF_KEY_ID'),
+        aws_secret_access_key=os.getenv('CF_KEY_SECRET'),
+        region_name="auto",  # Required by SDK but not used by R2
     )
-
-    # fetch download stats for new periods from s3
-    new_records = []
-    s3_file_paths = get_s3_file_paths(s3_client)
-    for file_path in s3_file_paths:
-        iso_year_str, _, iso_week_str = file_path.removeprefix(f'{S3_BUCKET_DIR}/').removesuffix('.json').partition('/')
-        if not is_valid_iso_year(iso_year_str) or not is_valid_iso_week(iso_week_str):
-            raise ValueError(
-                f"invalid file path: '{file_path}'; expected: '{S3_BUCKET_DIR}/<iso_year>/<iso_week>.json'"
-            )
-        year_week_file = (int(iso_year_str), int(iso_week_str))
-        if year_week_file not in periods_in_ducklake:
-            print(f"fetching data from {file_path}...")
-            new_records.extend(get_download_stats_from_file(s3_client, file_path))
-    new_extensions: set = {rec['extension_name'] for rec in new_records}.difference(extensions_in_ducklake)
-
-    # update ducklake
-    if new_records:
-        with DuckLakeConnection() as con:
-            con.execute(
-                f"""
-                CREATE TABLE
-                    IF NOT EXISTS {EXTENSION_DOWNLOADS_TABLE} (
-                        year USMALLINT,
-                        week UTINYINT,
-                        extension_name VARCHAR,
-                        downloads UINTEGER,
-                        last_update TIMESTAMP_S,
-                    )
-                """
-            )
-            con.execute(
-                f"""
-                CREATE TABLE
-                    IF NOT EXISTS {EXTENSION_TABLE} (
-                        name VARCHAR,
-                        repository VARCHAR,
-                    )
-                """
-            )
-            con.append_table(EXTENSION_DOWNLOADS_TABLE, new_records)
-            print(f"inserted {len(new_records)} records to table '{EXTENSION_DOWNLOADS_TABLE}'.")
-            if new_extensions:
-                con.append_table(EXTENSION_TABLE, [OrderedDict(
-                    name=extension_name,
-                    repository='core',
-                ) for extension_name in new_extensions])
-                print(f"added new extensions: [{", ".join(new_extensions)}]")
-    else:
-        print("no new extension stats to store")
+    return s3_client
 
 
 def is_valid_iso_week(s: str):
@@ -97,28 +93,28 @@ def is_valid_iso_year(s: str):
     return bool(re.fullmatch(r"\d{4}", s))
 
 
-def get_s3_file_paths(s3):
+def get_s3_file_paths(s3, bucket):
     # validations
     try:
-        s3.head_bucket(Bucket=S3_BUCKET)
+        s3.head_bucket(Bucket=bucket)
     except ClientError as e:
-        raise ValueError(f"failed to connect to bucket: '{S3_BUCKET}'; error: {e.response['Error']}")
-    response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=S3_BUCKET_DIR)
+        raise ValueError(f"failed to connect to bucket: '{bucket}'; error: {e.response['Error']}")
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=S3_BUCKET_DIR)
     if response['ResponseMetadata']['HTTPStatusCode'] != 200:
         raise ValueError(
             f"Request 'list_objects_v2' failed with status: {response['ResponseMetadata']['HTTPStatusCode']}"
         )
     if not 'Contents' in response:
-        raise ValueError(f"directory '{S3_BUCKET_DIR}' not found in bucket '{S3_BUCKET}'")
+        raise ValueError(f"directory '{S3_BUCKET_DIR}' not found in bucket '{bucket}'")
     file_paths = [obj['Key'] for obj in response['Contents']]
     if file_paths == []:
-        raise ValueError(f"no files found in directory '{S3_BUCKET_DIR}' in bucket '{S3_BUCKET}'")
+        raise ValueError(f"no files found in directory '{S3_BUCKET_DIR}' in bucket '{bucket}'")
     return file_paths
 
 
-def get_download_stats_from_file(s3_client, file_path):
+def get_download_stats_from_file(s3_client, bucket, file_path, repository):
     iso_year_str, _, iso_week_str = file_path.removeprefix(f'{S3_BUCKET_DIR}/').removesuffix('.json').partition('/')
-    response = s3_client.get_object(Bucket=S3_BUCKET, Key=file_path)
+    response = s3_client.get_object(Bucket=bucket, Key=file_path)
     content: dict = json.loads(response['Body'].read().decode('utf-8'))
     if '_last_update' not in content:
         raise ValueError(f"field '_last_update' not found in file {file_path}")
@@ -134,6 +130,7 @@ def get_download_stats_from_file(s3_client, file_path):
                 extension_name=extension_name,
                 downloads=downloads,
                 last_update=last_update,
+                repository=repository,
             )
             download_stats.append(record)
     return download_stats
