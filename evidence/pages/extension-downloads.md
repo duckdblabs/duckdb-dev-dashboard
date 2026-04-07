@@ -6,17 +6,13 @@ title: Extension Downloads
   select unnest(generate_series(1, 52)) as week
 ```
 
-```sql weeks_desc
-  select unnest(generate_series(52, 1, -1)) as week
-```
-
 <Dropdown name=from_year title="From Year">
     <DropdownOption value=2026/>
     <DropdownOption value=2025/>
     <DropdownOption value=2024/>
 </Dropdown>
 
-<Dropdown data={weeks_desc} name=from_week value=week title="From Week"/>
+<Dropdown data={weeks_asc} name=from_week value=week title="From Week" defaultValue={1} />
 
 <Dropdown name=to_year title="To Year">
     <DropdownOption value=2026/>
@@ -24,7 +20,7 @@ title: Extension Downloads
     <DropdownOption value=2024/>
 </Dropdown>
 
-<Dropdown data={weeks_asc} name=to_week value=week title="To Week"/>
+<Dropdown data={weeks_asc} name=to_week value=week title="To Week" defaultValue={52}/>
 
 <Dropdown name=repository title="Repository">
     <DropdownOption value="%" valueLabel="All"/>
