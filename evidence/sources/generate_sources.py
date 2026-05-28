@@ -21,6 +21,8 @@ def main():
 
     # create .duckdb source files from ducklake
     with DuckLakeConnection() as con:
+        con.execute(f"SET preserve_insertion_order=false")
+        con.execute(f"SET memory_limit = '8GB'")
         for source in sources:
             print(f"---\ngenerating sources for data-feed: {source['name']} ...")
             con.execute(f"ATTACH '{source['db_path']}' AS {source['name']}")
