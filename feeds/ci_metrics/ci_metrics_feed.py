@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from utils.ducklake import DuckLakeConnection
-from utils.github_utils import fetch_github_record_list, fetch_github_records
+from utils.github_utils import fetch_github_record_list, fetch_github_records, get_rate_limit
 from .ci_metrics_utils import RepoRatelimits, fetch_github_actions_runs, get_recent_run_ids_without_jobs
 from .ci_config import *
 
@@ -85,16 +85,29 @@ def update_runs(github_repos: list[str]):
 
     # fetch from gh api store in ducklake
     rate_limits = RepoRatelimits(github_repos)
+    retry_repo = None
     for github_repo in github_repos:
         rate_limit = rate_limits.get_repo_rate_limit(github_repo)
         assert github_repo in repos_max_run_id
         repo_id = repos_max_run_id[github_repo][0]
         repo_max_run_id = repos_max_run_id[github_repo][1]
         print(f"current max(id) for {github_repo} in {GITHUB_RUNS_TABLE}: {repo_max_run_id}")
-        runs = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id)
+        runs, retry_needed = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id)
+        if retry_needed and retry_repo is None:
+            retry_repo = github_repo
         if runs:
             store_runs(runs, create_table, repo_id, repo_max_run_id)
-        create_table = False
+            create_table = False
+    # per run, retry max one repo with remainder of rate limit:
+    if retry_repo:
+        github_repo = retry_repo
+        rate_limit = get_rate_limit() * GITHUB_RATE_LIMITING_FACTOR
+        print(f"retry fetching runs for repo '{github_repo}' with rate limit: {rate_limit}")
+        repo_id = repos_max_run_id[github_repo][0]
+        repo_max_run_id = repos_max_run_id[github_repo][1]
+        runs, _ = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id)
+        if runs:
+            store_runs(runs, create_table, repo_id, repo_max_run_id)
 
 
 def update_jobs(github_repos: list[str]):

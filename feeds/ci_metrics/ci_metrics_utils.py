@@ -21,21 +21,23 @@ class RepoRatelimits:
         return self.duckdb if github_repo == DUCKDB_REPO else self.non_duckdb
 
 
-def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previously_stored: int | None = None) -> list:
+def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previously_stored: int | None = None) -> tuple[list, bool]:
     endpoint = GITHUB_RUNS_ENDPOINT.format(GITHUB_REPO=github_repo)
     page = 1
     fetched_workflow_runs = []
+    retry_needed = False
     print(f"fetching from: {endpoint}")
     while True:
         print(f"page: {page}", flush=True)
         if page > rate_limit:
-            if latest_previously_stored == None:
+            if latest_previously_stored is None:
                 print(f"rate limit ({rate_limit}) hit!")
             else:
                 print(
                     f"::warning title=WARNING: runs for repo '{github_repo}' not updated!::rate limit ({rate_limit}) hit, but connecting run id not found. Storing nothing to prevent gaps"
                 )
                 fetched_workflow_runs = []
+                retry_needed = True
             break
         params = {"per_page": 100, "page": page}
         resp = gh_api_request(endpoint, params=params)
@@ -47,7 +49,7 @@ def fetch_github_actions_runs(rate_limit: int, github_repo: str, latest_previous
             break
         page += 1
     print(f"fetched {len(fetched_workflow_runs)} runs")
-    return fetched_workflow_runs
+    return fetched_workflow_runs, retry_needed
 
 
 def get_recent_run_ids_without_jobs(con: DuckLakeConnection) -> dict[str, list]:
