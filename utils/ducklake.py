@@ -19,10 +19,20 @@ class DuckLakeConnection:
         self.con.close()
 
     def sql(self, sql_str):
-        return self.con.sql(sql_str)
+        try:
+            return self.con.sql(sql_str)
+        except Exception as e:
+            raise RuntimeError(
+                f"Error while running: DuckLakeConnection.sql(\n{sql_str}\n)"
+                ) from e
 
     def execute(self, sql_str, parameters=None):
-        return self.con.execute(sql_str, parameters)
+        try:
+            return self.con.execute(sql_str, parameters)
+        except Exception as e:
+            raise type(e)(
+                f"Error while running: DuckLakeConnection.execute(\n{sql_str},\n{parameters}\n)"
+                ) from e
 
     def execute_transaction(self, sql_statments: list[str], parameters=None):
         sql_statments = [stmnt + ";" if stmnt[-1] != ';' else stmnt for stmnt in sql_statments]
