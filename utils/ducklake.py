@@ -165,18 +165,34 @@ class DuckLakeConnection:
 
     # https://ducklake.select/docs/stable/duckdb/maintenance/checkpoint
     def checkpoint(self):
+        print('Creating a checkpoint ...', flush=True)
         # workaround: ducklake_merge_adjacent_files runs into some errors sometimes, so checkpoint step by step
+        print('ducklake_flush_inlined_data', flush=True)
         self.con.execute(f"CALL ducklake_flush_inlined_data('{self.ducklake_db_alias}')")
+
+        print('ducklake_expire_snapshots', flush=True)
         self.con.execute(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}')")
+
+        print('ducklake_merge_adjacent_files 1', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_jobs')")
+        print('ducklake_merge_adjacent_files 2', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_repositories')")
+        print('ducklake_merge_adjacent_files 3', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_repositories_metadata')")
+        print('ducklake_merge_adjacent_files 4', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_runs')")
+        print('ducklake_merge_adjacent_files 5', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_workflows')")
+        print('ducklake_merge_adjacent_files 6', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'extension_downloads')")
+
+        print('ducklake_rewrite_data_files', flush=True)
         self.con.execute(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')")
+        print('ducklake_cleanup_old_files', flush=True)
         self.con.execute(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')")
+        print('ducklake_delete_orphaned_files', flush=True)
         self.con.execute(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')")
+        print('checkpointing done', flush=True)
         # self.con.execute("CHECKPOINT;")
 
 
