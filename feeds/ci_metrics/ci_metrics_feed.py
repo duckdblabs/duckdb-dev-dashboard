@@ -21,10 +21,12 @@ def run():
 
     print(f"===============\nupdating ci runs")
     update_runs(repo_names)
-
     print(f"===============\nupdating ci jobs")
     update_jobs(repo_names)
-
+    with DuckLakeConnection() as con:
+        con.execute("SET memory_limit = '8GB'")
+        con.execute("CALL set_option('expire_older_than', '1 month')")
+        con.checkpoint()
 
 def update_repositories(con: DuckLakeConnection) -> list[str]:
     repos = fetch_github_records(GITHUB_REPOS_ENDPOINT)
