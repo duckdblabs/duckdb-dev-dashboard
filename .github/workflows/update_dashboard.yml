@@ -2,8 +2,8 @@ name: Update Dashboard
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 */4 * * *'
+  # schedule:
+  #  - cron: '0 */4 * * *'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
