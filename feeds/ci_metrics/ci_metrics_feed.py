@@ -14,6 +14,11 @@ load_dotenv()
 
 def run():
     with DuckLakeConnection() as con:
+        con.execute("SET memory_limit = '8GB'")
+        con.execute("CALL set_option('expire_older_than', '1 month')")
+        con.execute("CHECKPOINT")
+
+    with DuckLakeConnection() as con:
         print(f"===============\nupdating repositories")
         repo_names = update_repositories(con)
         print(f"===============\nupdating ci workflows")
