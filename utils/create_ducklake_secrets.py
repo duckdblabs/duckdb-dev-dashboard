@@ -21,16 +21,16 @@ Q_CATALOG_SECRET = f"""
     )
     """
 
-# cloudflare r2 secret for ducklake storage
+# s3 bucket (staging)
 Q_STORAGE_SECRET = f"""
-    CREATE OR REPLACE PERSISTENT SECRET r2_secret (
-        TYPE r2,
-        ACCOUNT_ID '{os.getenv('DUCKLAKE_STORAGE_R2_ACCOUNT_ID')}',
+    CREATE SECRET s3_staging_test (
+        TYPE s3,
+        PROVIDER config,
         KEY_ID '{os.getenv('DUCKLAKE_STORAGE_S3_KEY_ID')}',
         SECRET '{os.getenv('DUCKLAKE_STORAGE_S3_SECRET')}',
-        REGION 'auto',
+        REGION 'eu-north-1',
         SCOPE '{os.getenv('DUCKLAKE_STORAGE_S3_ENDPOINT')}'
-    )
+    );
     """
 
 # ducklake connection secret (note: uses 'pg_secret' defined above)
