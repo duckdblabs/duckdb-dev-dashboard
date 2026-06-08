@@ -9,13 +9,13 @@ import duckdb
 load_dotenv()
 
 
-# postgres secret for ducklake catalog
+# postgres secret for: ducklake_catalog_staging
 Q_CATALOG_SECRET = f"""
     CREATE OR REPLACE PERSISTENT SECRET pg_secret (
         TYPE postgres,
         HOST '{os.getenv('DUCKLAKE_CATALOG_PG_HOST')}',
         PORT 5432,
-        DATABASE ducklake_catalog,
+        DATABASE ducklake_catalog_staging,
         USER '{os.getenv('DUCKLAKE_CATALOG_PG_USER')}',
         PASSWORD '{os.getenv('DUCKLAKE_CATALOG_PG_PASSWORD')}'
     )
