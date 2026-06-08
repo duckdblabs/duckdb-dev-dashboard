@@ -186,8 +186,8 @@ def store_runs(runs, create_table, repo_id, latest_previously_stored, max_age: i
                         where True
                         {f"and id < {oldest_non_completed}" if oldest_non_completed else ''}
                         {f"and id > {latest_previously_stored}" if latest_previously_stored else ''}
-                        order by id asc
-                        limit 30
+                        -- order by id asc
+                        -- limit 30
                         )
                         """
             if not con.sql(f"select 1 from {subquery} limit 1").fetchone():
