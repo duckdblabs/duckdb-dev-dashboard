@@ -23,7 +23,7 @@ Q_CATALOG_SECRET = f"""
 
 # s3 bucket (staging)
 Q_STORAGE_SECRET = f"""
-    CREATE SECRET s3_staging_test (
+    CREATE OR REPLACE PERSISTENT SECRET s3_staging_test (
         TYPE s3,
         PROVIDER config,
         KEY_ID '{os.getenv('DUCKLAKE_STORAGE_S3_KEY_ID')}',
@@ -49,7 +49,6 @@ def create_ducklake_secrets():
         con.execute(Q_CATALOG_SECRET)
         con.execute(Q_STORAGE_SECRET)
         con.execute(Q_DUCKLAKE_SECRET)
-        con.sql('from duckdb_secrets()').show()
 
 
 def validate_env():
