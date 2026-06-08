@@ -13,21 +13,21 @@ load_dotenv()
 
 
 def run():
-    with DuckLakeConnection() as con:
-        con.execute("SET memory_limit = '8GB'")
-        con.execute("CALL set_option('expire_older_than', '1 month')")
-        con.execute("CHECKPOINT")
+    # with DuckLakeConnection() as con:
+    #     con.execute("SET memory_limit = '8GB'")
+    #     con.execute("CALL set_option('expire_older_than', '1 month')")
+    #     con.execute("CHECKPOINT")
 
-    with DuckLakeConnection() as con:
-        print(f"===============\nupdating repositories")
-        repo_names = update_repositories(con)
-        print(f"===============\nupdating ci workflows")
-        update_workflows(repo_names, con)
+    # with DuckLakeConnection() as con:
+    #     print(f"===============\nupdating repositories")
+    #     repo_names = update_repositories(con)
+    #     print(f"===============\nupdating ci workflows")
+    #     update_workflows(repo_names, con)
 
     print(f"===============\nupdating ci runs")
-    update_runs(repo_names)
-    print(f"===============\nupdating ci jobs")
-    update_jobs(repo_names)
+    update_runs(['duckdb/duckdb'])
+    # print(f"===============\nupdating ci jobs")
+    # update_jobs(repo_names)
     with DuckLakeConnection() as con:
         con.execute("SET memory_limit = '8GB'")
         con.execute("CALL set_option('expire_older_than', '1 month')")
@@ -186,6 +186,8 @@ def store_runs(runs, create_table, repo_id, latest_previously_stored, max_age: i
                         where True
                         {f"and id < {oldest_non_completed}" if oldest_non_completed else ''}
                         {f"and id > {latest_previously_stored}" if latest_previously_stored else ''}
+                        order by id asc
+                        limit 30
                         )
                         """
             if not con.sql(f"select 1 from {subquery} limit 1").fetchone():
