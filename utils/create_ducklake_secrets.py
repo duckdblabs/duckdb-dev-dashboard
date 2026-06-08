@@ -49,6 +49,7 @@ def create_ducklake_secrets():
         con.execute(Q_CATALOG_SECRET)
         con.execute(Q_STORAGE_SECRET)
         con.execute(Q_DUCKLAKE_SECRET)
+        con.sql('from duckdb_secrets()').show()
 
 
 def validate_env():
