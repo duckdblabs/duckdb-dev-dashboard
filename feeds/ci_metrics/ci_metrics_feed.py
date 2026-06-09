@@ -30,7 +30,7 @@ def run():
     # update_jobs(repo_names)
     with DuckLakeConnection() as con:
         con.execute("SET memory_limit = '8GB'")
-        con.execute("CALL set_option('expire_older_than', '1 month')")
+        con.execute("CALL set_option('expire_older_than', '26 days')")
         con.checkpoint()
 
 def update_repositories(con: DuckLakeConnection) -> list[str]:

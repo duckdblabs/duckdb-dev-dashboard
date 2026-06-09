@@ -171,7 +171,10 @@ class DuckLakeConnection:
         self.con.execute(f"CALL ducklake_flush_inlined_data('{self.ducklake_db_alias}')")
 
         print('ducklake_expire_snapshots', flush=True)
-        self.con.execute(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}')")
+        print('dry run...', flush=True)
+        self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}', dry_run => true)").show()
+        print('actual...', flush=True)
+        self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}')").show()
 
         print('ducklake_merge_adjacent_files 1', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_jobs')")
