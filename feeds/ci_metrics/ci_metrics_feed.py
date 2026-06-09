@@ -21,8 +21,8 @@ def run():
     with DuckLakeConnection() as con:
         print(f"===============\nupdating repositories")
         repo_names = update_repositories(con)
-        # print(f"===============\nupdating ci workflows")
-        # update_workflows(repo_names, con)
+        print(f"===============\nupdating ci workflows")
+        update_workflows(repo_names, con)
 
     print(f"===============\nupdating ci runs")
     update_runs(repo_names)
@@ -30,7 +30,7 @@ def run():
     # update_jobs(repo_names)
     with DuckLakeConnection() as con:
         con.execute("SET memory_limit = '8GB'")
-        con.execute("CALL set_option('expire_older_than', '26 days')")
+        con.execute("CALL set_option('expire_older_than', '25 days')")
         con.checkpoint()
 
 def update_repositories(con: DuckLakeConnection) -> list[str]:
