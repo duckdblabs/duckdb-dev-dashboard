@@ -1,11 +1,12 @@
 # run this file via Makefile: 'make run_feeds'
 
+import feeds.compactor.compactor as compactor
 import feeds.ci_metrics.ci_metrics_feed as ci_metrics_feed
 import feeds.extension_downloads.extension_downloads_feed as extension_downloads_feed
 
 
 FEEDS = [
-    ("compactor", ci_metrics_feed.run),
+    ("compactor", compactor.run),
     # ("ci_metrics_feed", ci_metrics_feed.run),
     # ("extension_downloads_feed", extension_downloads_feed.run),
 ]
