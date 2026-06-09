@@ -21,7 +21,6 @@ def run():
     with DuckLakeConnection() as con:
         print(f"===============\nupdating repositories")
         repo_names = update_repositories(con)
-        repo_names = ['duckdb/duckdb']
         print(f"===============\nupdating ci workflows")
         update_workflows(repo_names, con)
 
