@@ -171,9 +171,9 @@ class DuckLakeConnection:
         self.con.execute(f"CALL ducklake_flush_inlined_data('{self.ducklake_db_alias}')")
 
         print('ducklake_expire_snapshots', flush=True)
-        print('dry run...', flush=True)
-        self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}', dry_run => true)").show()
-        print('actual...', flush=True)
+        # print('dry run...', flush=True)
+        # self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}', dry_run => true)").show()
+        # print('actual...', flush=True)
         self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}')").show()
 
         print('ducklake_merge_adjacent_files 1', flush=True)
@@ -188,14 +188,13 @@ class DuckLakeConnection:
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'ci_workflows')")
         print('ducklake_merge_adjacent_files 6', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'extension_downloads')")
-
-        # print('ducklake_rewrite_data_files', flush=True)
-        # self.con.execute(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')")
-        # print('ducklake_cleanup_old_files', flush=True)
-        # self.con.execute(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')")
-        # print('ducklake_delete_orphaned_files', flush=True)
-        # self.con.execute(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')")
-        # print('checkpointing done', flush=True)
+        print('ducklake_rewrite_data_files', flush=True)
+        self.con.execute(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')")
+        print('ducklake_cleanup_old_files', flush=True)
+        self.con.execute(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')")
+        print('ducklake_delete_orphaned_files', flush=True)
+        self.con.execute(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')")
+        print('checkpointing done', flush=True)
         # self.con.execute("CHECKPOINT;")
 
 
