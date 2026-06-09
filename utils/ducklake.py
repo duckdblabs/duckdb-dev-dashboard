@@ -186,13 +186,13 @@ class DuckLakeConnection:
         print('ducklake_merge_adjacent_files 6', flush=True)
         self.con.execute(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}', 'extension_downloads')")
 
-        print('ducklake_rewrite_data_files', flush=True)
-        self.con.execute(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')")
-        print('ducklake_cleanup_old_files', flush=True)
-        self.con.execute(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')")
-        print('ducklake_delete_orphaned_files', flush=True)
-        self.con.execute(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')")
-        print('checkpointing done', flush=True)
+        # print('ducklake_rewrite_data_files', flush=True)
+        # self.con.execute(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')")
+        # print('ducklake_cleanup_old_files', flush=True)
+        # self.con.execute(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')")
+        # print('ducklake_delete_orphaned_files', flush=True)
+        # self.con.execute(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')")
+        # print('checkpointing done', flush=True)
         # self.con.execute("CHECKPOINT;")
 
 

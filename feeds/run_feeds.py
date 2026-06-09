@@ -6,8 +6,8 @@ import feeds.extension_downloads.extension_downloads_feed as extension_downloads
 
 
 FEEDS = [
-    ("compactor", compactor.run),
-    # ("ci_metrics_feed", ci_metrics_feed.run),
+    # ("compactor", compactor.run),
+    ("ci_metrics_feed", ci_metrics_feed.run),
     # ("extension_downloads_feed", extension_downloads_feed.run),
 ]
 
