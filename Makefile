@@ -31,5 +31,9 @@ venv:
 	python3 -m venv venv
 	./venv/bin/python3 -m pip install -r requirements.txt
 
+# create a local copy of the ducklake, and secret: 'ducklake_secret_local'
 sync_local:
 	python3 -m utils.sync_local
+
+run_feeds_local:
+	python3 -m feeds.run_feeds local

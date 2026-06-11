@@ -60,6 +60,18 @@ def create_local_storage(local_data_path: Path):
     print(result.stdout)
 
 
+def create_local_secret(sync_dir: Path):
+    abs_catalog_path = (sync_dir / DUCKDB_CATALOG).absolute()
+    with duckdb.connect() as con:
+        con.execute(f"""
+            CREATE OR REPLACE PERSISTENT SECRET ducklake_secret_local (
+                TYPE ducklake,
+                METADATA_PATH '{abs_catalog_path}'
+            );
+        """)
+    print(f"updated 'ducklake_secret_local', it now points to: {abs_catalog_path}")
+
+
 def main():
     root_dir = Path('local_copy')
     sync_dir = root_dir / f"dl_{datetime.now().strftime("%Y%m%d_%H%M%S")}"
@@ -67,11 +79,14 @@ def main():
     local_data_path.mkdir(parents=True)
     create_local_catalog(sync_dir, local_data_path)
     create_local_storage(local_data_path)
+    create_local_secret(sync_dir)
 
     connection_str = (
         "install ducklake; load ducklake;\n"
-        f"attach 'ducklake:{(sync_dir / DUCKDB_CATALOG)}' as my_ducklake; use my_ducklake;\n"
-        "-- show tables;"
+        f"attach 'ducklake:{sync_dir}/{DUCKDB_CATALOG}' as my_ducklake; use my_ducklake;\n"
+        "-- show tables;\n\n"
+        "-- or:\n"
+        "-- attach 'ducklake:ducklake_secret_local' as my_ducklake; use my_ducklake;\n"
     )
     connect_sql_file = sync_dir / 'connect.sql'
     connect_sql_file.write_text(connection_str)

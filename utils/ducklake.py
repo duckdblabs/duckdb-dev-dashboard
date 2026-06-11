@@ -5,13 +5,14 @@ import tempfile
 
 
 class DuckLakeConnection:
-    def __init__(self):
+    def __init__(self, connection_string=''):
         self.ducklake_db_alias = 'my_ducklake'
         self.catalog = f"__ducklake_metadata_{self.ducklake_db_alias}"
+        self.connection_string = connection_string
 
     def __enter__(self):
         self.con = duckdb.connect()
-        self.con.execute(f"ATTACH 'ducklake:ducklake_secret' AS {self.ducklake_db_alias} (AUTOMATIC_MIGRATION)")
+        self.con.execute(f"ATTACH 'ducklake:{self.connection_string}' AS {self.ducklake_db_alias} (AUTOMATIC_MIGRATION)")
         self.con.execute(f"USE {self.ducklake_db_alias}")
         return self
 

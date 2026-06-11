@@ -20,7 +20,7 @@ def main():
     sources = json.loads(sources_config.read_text())
 
     # create .duckdb source files from ducklake
-    with DuckLakeConnection() as con:
+    with DuckLakeConnection('ducklake_secret') as con:
         con.execute(f"SET preserve_insertion_order=false")
         con.execute(f"SET memory_limit = '8GB'")
         for source in sources:
