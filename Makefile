@@ -1,4 +1,4 @@
-.PHONY: all secrets run_feeds merge_adjacent_files generate_sources build dev venv
+.PHONY: all secrets run_feeds maintain generate_sources build dev venv sync_local run_feeds_local
 
 all: run_feeds generate_sources build
 
@@ -10,8 +10,8 @@ secrets:
 run_feeds:
 	python3 -m feeds.run_feeds
 
-merge_adjacent_files:
-	duckdb -f utils/maintainance.sql
+maintain:
+	duckdb -f utils/maintenance.sql
 
 # generates duckdb files from ducklake (required by evidence)
 generate_sources:
@@ -28,8 +28,8 @@ dev:
 
 # locally set up python venv
 venv:
-	python3 -m venv venv
-	./venv/bin/python3 -m pip install -r requirements.txt
+	python3 -m venv .venv
+	./.venv/bin/python3 -m pip install -r requirements.txt
 
 # create a local copy of the ducklake, and secret: 'ducklake_secret_local'
 sync_local:

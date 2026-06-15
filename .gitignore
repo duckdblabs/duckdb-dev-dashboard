@@ -1,7 +1,7 @@
 *.duckdb
 *.wal
 .env
-venv
+.venv
 **/.vscode
 **/.evidence
 local_copy

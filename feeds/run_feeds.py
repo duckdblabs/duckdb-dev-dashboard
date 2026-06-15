@@ -3,15 +3,13 @@
 import duckdb
 import sys
 
-import feeds.compactor.compactor as compactor
 import feeds.ci_metrics.ci_metrics_feed as ci_metrics_feed
 import feeds.extension_downloads.extension_downloads_feed as extension_downloads_feed
 
 
 FEEDS = [
-    # ("compactor", compactor.run),
     ("ci_metrics_feed", ci_metrics_feed.run),
-    # ("extension_downloads_feed", extension_downloads_feed.run),
+    ("extension_downloads_feed", extension_downloads_feed.run),
 ]
 
 

@@ -9,29 +9,41 @@ import duckdb
 load_dotenv()
 
 
-# postgres secret for: ducklake_catalog_staging
+# postgres secret for ducklake catalog
 Q_CATALOG_SECRET = f"""
     CREATE OR REPLACE PERSISTENT SECRET pg_secret (
         TYPE postgres,
         HOST '{os.getenv('DUCKLAKE_CATALOG_PG_HOST')}',
         PORT 5432,
-        DATABASE ducklake_catalog_staging,
+        DATABASE ducklake_catalog,
         USER '{os.getenv('DUCKLAKE_CATALOG_PG_USER')}',
         PASSWORD '{os.getenv('DUCKLAKE_CATALOG_PG_PASSWORD')}'
     )
     """
 
-# s3 bucket (staging)
+# cloudflare r2 secret for ducklake storage
 Q_STORAGE_SECRET = f"""
-    CREATE OR REPLACE PERSISTENT SECRET s3_staging_test (
-        TYPE s3,
-        PROVIDER config,
+    CREATE OR REPLACE PERSISTENT SECRET r2_secret (
+        TYPE r2,
+        ACCOUNT_ID '{os.getenv('DUCKLAKE_STORAGE_R2_ACCOUNT_ID')}',
         KEY_ID '{os.getenv('DUCKLAKE_STORAGE_S3_KEY_ID')}',
         SECRET '{os.getenv('DUCKLAKE_STORAGE_S3_SECRET')}',
-        REGION 'eu-north-1',
+        REGION 'auto',
         SCOPE '{os.getenv('DUCKLAKE_STORAGE_S3_ENDPOINT')}'
-    );
+    )
     """
+
+# s3 bucket (staging)
+# Q_STORAGE_SECRET_STAGING = f"""
+#     CREATE OR REPLACE PERSISTENT SECRET s3_staging_test (
+#         TYPE s3,
+#         PROVIDER config,
+#         KEY_ID '{os.getenv('DUCKLAKE_STORAGE_S3_KEY_ID')}',
+#         SECRET '{os.getenv('DUCKLAKE_STORAGE_S3_SECRET')}',
+#         REGION 'eu-north-1',
+#         SCOPE '{os.getenv('DUCKLAKE_STORAGE_S3_ENDPOINT')}'
+#     );
+#     """
 
 # ducklake connection secret (note: uses 'pg_secret' defined above)
 Q_DUCKLAKE_SECRET = f"""
@@ -56,6 +68,7 @@ def validate_env():
         "DUCKLAKE_STORAGE_S3_KEY_ID",
         "DUCKLAKE_STORAGE_S3_SECRET",
         "DUCKLAKE_STORAGE_S3_ENDPOINT",
+        "DUCKLAKE_STORAGE_R2_ACCOUNT_ID",
         "DUCKLAKE_CATALOG_PG_PASSWORD",
         "DUCKLAKE_CATALOG_PG_HOST",
         "DUCKLAKE_CATALOG_PG_USER",

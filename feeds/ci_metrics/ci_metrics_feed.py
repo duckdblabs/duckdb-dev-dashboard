@@ -13,11 +13,6 @@ load_dotenv()
 
 
 def run(dl_secret: str):
-    # with DuckLakeConnection(dl_secret) as con:
-    #     con.execute("SET memory_limit = '8GB'")
-    #     con.execute("CALL set_option('expire_older_than', '1 month')")
-    #     con.execute("CHECKPOINT")
-
     with DuckLakeConnection(dl_secret) as con:
         print(f"===============\nupdating repositories")
         repo_names = update_repositories(con)
@@ -29,9 +24,8 @@ def run(dl_secret: str):
     print(f"===============\nupdating ci jobs")
     update_jobs(repo_names, dl_secret)
     with DuckLakeConnection(dl_secret) as con:
-        con.execute("SET memory_limit = '8GB'")
-        con.execute("CALL set_option('expire_older_than', '24 days')")
         con.checkpoint()
+
 
 def update_repositories(con: DuckLakeConnection) -> list[str]:
     repos = fetch_github_records(GITHUB_REPOS_ENDPOINT)
@@ -186,8 +180,6 @@ def store_runs(dl_secret, runs, create_table, repo_id, latest_previously_stored,
                         where True
                         {f"and id < {oldest_non_completed}" if oldest_non_completed else ''}
                         {f"and id > {latest_previously_stored}" if latest_previously_stored else ''}
-                        -- order by id asc
-                        -- limit 30
                         )
                         """
             if not con.sql(f"select 1 from {subquery} limit 1").fetchone():
