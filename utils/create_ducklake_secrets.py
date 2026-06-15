@@ -33,6 +33,18 @@ Q_STORAGE_SECRET = f"""
     )
     """
 
+# s3 bucket (staging)
+# Q_STORAGE_SECRET_STAGING = f"""
+#     CREATE OR REPLACE PERSISTENT SECRET s3_staging_test (
+#         TYPE s3,
+#         PROVIDER config,
+#         KEY_ID '{os.getenv('DUCKLAKE_STORAGE_S3_KEY_ID')}',
+#         SECRET '{os.getenv('DUCKLAKE_STORAGE_S3_SECRET')}',
+#         REGION 'eu-north-1',
+#         SCOPE '{os.getenv('DUCKLAKE_STORAGE_S3_ENDPOINT')}'
+#     );
+#     """
+
 # ducklake connection secret (note: uses 'pg_secret' defined above)
 Q_DUCKLAKE_SECRET = f"""
     CREATE OR REPLACE PERSISTENT SECRET ducklake_secret (

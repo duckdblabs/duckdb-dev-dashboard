@@ -12,18 +12,19 @@ from .ci_config import *
 load_dotenv()
 
 
-def run():
-    with DuckLakeConnection() as con:
+def run(dl_secret: str):
+    with DuckLakeConnection(dl_secret) as con:
         print(f"===============\nupdating repositories")
         repo_names = update_repositories(con)
         print(f"===============\nupdating ci workflows")
         update_workflows(repo_names, con)
 
     print(f"===============\nupdating ci runs")
-    update_runs(repo_names)
-
+    update_runs(repo_names, dl_secret)
     print(f"===============\nupdating ci jobs")
-    update_jobs(repo_names)
+    update_jobs(repo_names, dl_secret)
+    with DuckLakeConnection(dl_secret) as con:
+        con.checkpoint()
 
 
 def update_repositories(con: DuckLakeConnection) -> list[str]:
@@ -61,9 +62,9 @@ def update_workflows(github_repos: list[str], con: DuckLakeConnection):
         print(f"no workflows found")
 
 
-def update_runs(github_repos: list[str]):
+def update_runs(github_repos: list[str], dl_secret):
     # get ducklake state
-    with DuckLakeConnection() as con:
+    with DuckLakeConnection(dl_secret) as con:
         if con.table_exists(GITHUB_RUNS_TABLE):
             if con.table_empty(GITHUB_RUNS_TABLE):
                 raise ValueError(f"Invalid state - Table {GITHUB_RUNS_TABLE} should not be empty")
@@ -96,7 +97,7 @@ def update_runs(github_repos: list[str]):
         if retry_needed and retry_repo is None:
             retry_repo = github_repo
         if runs:
-            store_runs(runs, create_table, repo_id, repo_max_run_id)
+            store_runs(dl_secret, runs, create_table, repo_id, repo_max_run_id)
             create_table = False
     # per run, retry max one repo with remainder of rate limit:
     if retry_repo:
@@ -107,13 +108,13 @@ def update_runs(github_repos: list[str]):
         repo_max_run_id = repos_max_run_id[github_repo][1]
         runs, _ = fetch_github_actions_runs(rate_limit, github_repo, repo_max_run_id)
         if runs:
-            store_runs(runs, create_table, repo_id, repo_max_run_id)
+            store_runs(dl_secret, runs, create_table, repo_id, repo_max_run_id)
 
 
-def update_jobs(github_repos: list[str]):
+def update_jobs(github_repos: list[str], dl_secret):
     rate_limits = RepoRatelimits(github_repos)
     # get runs without jobs
-    with DuckLakeConnection() as con:
+    with DuckLakeConnection(dl_secret) as con:
         assert con.table_exists(GITHUB_RUNS_TABLE), f"tabel {GITHUB_RUNS_TABLE} does not exist"
         if con.table_exists(GITHUB_JOBS_TABLE):
             if con.table_empty(GITHUB_JOBS_TABLE):
@@ -153,16 +154,16 @@ def update_jobs(github_repos: list[str]):
 
         # store in ducklake
         if new_jobs:
-            store_jobs(new_jobs, create_table)
+            store_jobs(dl_secret, new_jobs, create_table)
             create_table = False
 
 
-def store_runs(runs, create_table, repo_id, latest_previously_stored, max_age: int | None = GITHUB_RUNS_STALE_DELAY):
+def store_runs(dl_secret, runs, create_table, repo_id, latest_previously_stored, max_age: int | None = GITHUB_RUNS_STALE_DELAY):
     runs_str = f"[{',\n'.join([json.dumps(r) for r in runs])}]"
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".json") as tmp:
         tmp.write(runs_str)
         tmp.flush()
-        with DuckLakeConnection() as con:
+        with DuckLakeConnection(dl_secret) as con:
             # subquery to fetch only consecutive completed runs (i.e. no 'queued' or 'in progress' in between)
             # Note: max_age age can be set to to filter out stale runs.
             stale_timestamp = (
@@ -203,12 +204,12 @@ def store_runs(runs, create_table, repo_id, latest_previously_stored, max_age: i
             con.sql(f"select id, created_at, status, html_url, '...' as 'more ...' from {subquery} order by id").show()
 
 
-def store_jobs(jobs, create_table):
+def store_jobs(dl_secret, jobs, create_table):
     jobs_str = f"[{',\n'.join([json.dumps(j) for j in jobs])}]"
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".json") as tmp:
         tmp.write(jobs_str)
         tmp.flush()
-        with DuckLakeConnection() as con:
+        with DuckLakeConnection(dl_secret) as con:
             subquery = f"(select * from read_json('{tmp.name}'))"
             if create_table:
                 con.execute(f"create table {GITHUB_JOBS_TABLE} as {subquery}")

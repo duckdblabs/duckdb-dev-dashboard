@@ -5,13 +5,14 @@ import tempfile
 
 
 class DuckLakeConnection:
-    def __init__(self):
+    def __init__(self, connection_string=''):
         self.ducklake_db_alias = 'my_ducklake'
         self.catalog = f"__ducklake_metadata_{self.ducklake_db_alias}"
+        self.connection_string = connection_string
 
     def __enter__(self):
         self.con = duckdb.connect()
-        self.con.execute(f"ATTACH 'ducklake:ducklake_secret' AS {self.ducklake_db_alias} (AUTOMATIC_MIGRATION)")
+        self.con.execute(f"ATTACH 'ducklake:{self.connection_string}' AS {self.ducklake_db_alias} (AUTOMATIC_MIGRATION)")
         self.con.execute(f"USE {self.ducklake_db_alias}")
         return self
 
@@ -30,7 +31,7 @@ class DuckLakeConnection:
         try:
             return self.con.execute(sql_str, parameters)
         except Exception as e:
-            raise type(e)(
+            raise RuntimeError(
                 f"Error while running: DuckLakeConnection.execute(\n{sql_str},\n{parameters}\n)"
                 ) from e
 
@@ -162,6 +163,25 @@ class DuckLakeConnection:
             order by id;
             """
         )
+
+    # https://ducklake.select/docs/stable/duckdb/maintenance/checkpoint
+    def checkpoint(self):
+        print('\nCreating a checkpoint ...', flush=True)
+        self.con.execute("SET memory_limit = '8GB'")
+        self.con.execute("CALL set_option('expire_older_than', '1 month')")
+        print("ducklake_flush_inlined_data", flush=True)
+        self.con.sql(f"CALL ducklake_flush_inlined_data('{self.ducklake_db_alias}')").show()
+        print("ducklake_expire_snapshots", flush=True)
+        self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}')").show()
+        print("ducklake_merge_adjacent_files", flush=True)
+        self.con.sql(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}')").show()
+        print("ducklake_rewrite_data_files", flush=True)
+        self.con.sql(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')").show()
+        print("ducklake_cleanup_old_files", flush=True)
+        self.con.sql(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')").show()
+        print("ducklake_delete_orphaned_files", flush=True)
+        self.con.sql(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')").show()
+        # self.con.execute("CHECKPOINT;")
 
 
 # example usage:
