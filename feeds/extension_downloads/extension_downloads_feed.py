@@ -23,7 +23,7 @@ def run(dl_secret: str):
 
     # fetch periods and extension names already stored in ducklake
     with DuckLakeConnection(dl_secret) as con:
-        create_tables_if_not_exists(con)
+        create_extension_table_if_not_exists(con)
         periods_in_ducklake = con.sql(f"select distinct year, week from {EXTENSION_DOWNLOADS_TABLE}").fetchall()
 
         for bucket in (S3_BUCKET_CORE, S3_BUCKET_COMMUNITY):
@@ -57,7 +57,7 @@ def run(dl_secret: str):
                 print(f"repo {repository}: no new extension stats to store")
 
 
-def create_tables_if_not_exists(con: DuckLakeConnection):
+def create_extension_table_if_not_exists(con: DuckLakeConnection):
     con.execute(
         f"""
         CREATE TABLE

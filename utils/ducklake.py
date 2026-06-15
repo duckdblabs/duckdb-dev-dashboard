@@ -166,14 +166,20 @@ class DuckLakeConnection:
 
     # https://ducklake.select/docs/stable/duckdb/maintenance/checkpoint
     def checkpoint(self):
-        print('Creating a checkpoint ...', flush=True)
+        print('\nCreating a checkpoint ...', flush=True)
         self.con.execute("SET memory_limit = '8GB'")
         self.con.execute("CALL set_option('expire_older_than', '1 month')")
+        print("ducklake_flush_inlined_data", flush=True)
         self.con.sql(f"CALL ducklake_flush_inlined_data('{self.ducklake_db_alias}')").show()
+        print("ducklake_expire_snapshots", flush=True)
         self.con.sql(f"CALL ducklake_expire_snapshots('{self.ducklake_db_alias}')").show()
+        print("ducklake_merge_adjacent_files", flush=True)
         self.con.sql(f"CALL ducklake_merge_adjacent_files('{self.ducklake_db_alias}')").show()
+        print("ducklake_rewrite_data_files", flush=True)
         self.con.sql(f"CALL ducklake_rewrite_data_files('{self.ducklake_db_alias}')").show()
+        print("ducklake_cleanup_old_files", flush=True)
         self.con.sql(f"CALL ducklake_cleanup_old_files('{self.ducklake_db_alias}')").show()
+        print("ducklake_delete_orphaned_files", flush=True)
         self.con.sql(f"CALL ducklake_delete_orphaned_files('{self.ducklake_db_alias}')").show()
         # self.con.execute("CHECKPOINT;")
 
