@@ -1,51 +1,111 @@
-# creates local copy of the ducklake for testing and debug
-# - copies the postgres catalog into local duckdb catalog file
-# - copies parquet data from cloudflare r2 to local dir
+# creates a local copy of the ducklake for testing and debug, in direcory ./local_copy
+# - copies the postgres catalog to a local postgres instance
+# - copies parquet data from cloudflare r2 to the local dir
+
+# each run creates an independent, timestamped copy
+# secret 'ducklake_secret_local' points at the most recent one.
 
 
 from datetime import datetime
 from dotenv import load_dotenv
 import duckdb
+import getpass
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import time
 
 load_dotenv()
 
-DUCKDB_CATALOG = "my_ducklake.ducklake"
 POSTGRES_CATALOG_DB = "ducklake_catalog"
 
+BREW_PG_FORMULA = "postgresql@17"
+LOCAL_PG_HOST = "localhost"
+LOCAL_PG_PORT = 5432
+LOCAL_PG_USER = getpass.getuser()
 
-def create_local_catalog(sync_dir: Path, local_data_path: Path):
-    with duckdb.connect() as con:
-        con.execute("INSTALL postgres; LOAD postgres;")
-        con.execute(f"""
-            CREATE SECRET pg_reader (
-                TYPE postgres,
-                HOST '{os.getenv('DUCKLAKE_CATALOG_PG_HOST')}',
-                PORT 5432,
-                DATABASE {POSTGRES_CATALOG_DB},
-                USER '{os.getenv('DUCKLAKE_CATALOG_PG_USER')}',
-                PASSWORD '{os.getenv('DUCKLAKE_CATALOG_PG_PASSWORD')}'
-            );
-        """)
-        # attach source and destination databases
-        con.execute(f"ATTACH '' AS postgres_db (TYPE postgres, SCHEMA 'public', SECRET pg_reader, READ_ONLY);")
-        con.execute(f"ATTACH '{sync_dir}/{DUCKDB_CATALOG}' AS my_ducklake;")
-        # copy catalog tables into local catalog file
-        catalog_tables = [tup[0] for tup in con.sql(f"show tables from postgres_db").fetchall()]
-        for table in catalog_tables:
-            print(f"syncing catalog table: {table} ...")
-            con.execute(f"CREATE TABLE my_ducklake.{table} AS FROM postgres_db.{table}")
-        # update data_path in ducklake_metadata: NOTE: absolute path with trailing slash!
-        data_path = str(local_data_path.absolute()) + '/'
-        print(f"update metadata: set data_path to: '{data_path}'")
-        con.execute(f"update my_ducklake.ducklake_metadata set value = '{data_path}' where key = 'data_path'")
+
+def validate_env():
+    # read-only production credentials should be available, to make a local copy
+    required_env_vars = [
+        "DUCKLAKE_CATALOG_PG_HOST",
+        "DUCKLAKE_CATALOG_PG_USER",
+        "DUCKLAKE_CATALOG_PG_PASSWORD",
+        "DUCKLAKE_STORAGE_R2_ACCOUNT_ID",
+    ]
+    for env_var in required_env_vars:
+        if env_var not in os.environ.keys():
+            raise ValueError(f"Env variable '{env_var}' is missing!")
+        if os.getenv(env_var) == "":
+            raise ValueError(f"Env variable '{env_var}' is empty!")
+
+
+def require_pg_tools():
+    missing = [tool for tool in ["pg_isready", "createdb", "dropdb", "pg_dump", "psql"] if shutil.which(tool) is None]
+    if missing:
+        raise RuntimeError(
+            f"required postgres tools not found on PATH: {', '.join(missing)}"
+        )
+
+
+def ensure_local_pg():
+    print(f"ensuring local postgres ({BREW_PG_FORMULA}) is running ...", flush=True)
+    subprocess.run(["brew", "services", "start", BREW_PG_FORMULA], check=True)
+    for _ in range(30):
+        ready = subprocess.run(["pg_isready", "-h", LOCAL_PG_HOST, "-p", str(LOCAL_PG_PORT)])
+        if ready.returncode == 0:
+            return
+        time.sleep(1)
+    raise RuntimeError("local postgres did not become ready in time")
+
+
+def create_local_catalog(db_name: str, local_data_path: Path):
+    require_pg_tools()
+    ensure_local_pg()
+    print(f"creating local database '{db_name}' ...", flush=True)
+    subprocess.run(["createdb", "-h", LOCAL_PG_HOST, "-p", str(LOCAL_PG_PORT), db_name], check=True)
+
+    # copy the production catalog verbatim into the local db
+    print(f"copying catalog '{POSTGRES_CATALOG_DB}' from production into '{db_name}' ...", flush=True)
+    dump_env = {**os.environ, "PGPASSWORD": os.getenv("DUCKLAKE_CATALOG_PG_PASSWORD", "")}
+    dump = subprocess.Popen(
+        [
+            "pg_dump",
+            "-h", os.getenv("DUCKLAKE_CATALOG_PG_HOST"),
+            "-p", "5432",
+            "-U", os.getenv("DUCKLAKE_CATALOG_PG_USER"),
+            "-d", POSTGRES_CATALOG_DB,
+            "--no-owner", "--no-privileges",
+        ],
+        stdout=subprocess.PIPE,
+        env=dump_env,
+    )
+    restore = subprocess.Popen(
+        ["psql", "-h", LOCAL_PG_HOST, "-p", str(LOCAL_PG_PORT), "-d", db_name, "-v", "ON_ERROR_STOP=1", "-q"],
+        stdin=dump.stdout,
+    )
+    dump.stdout.close()  # let pg_dump receive SIGPIPE if psql exits early
+    restore.communicate()
+    dump.wait()
+    if dump.returncode != 0 or restore.returncode != 0:
+        raise RuntimeError(f"catalog copy failed (pg_dump exit={dump.returncode}, psql exit={restore.returncode})")
+
+    # update data_path in ducklake_metadata: NOTE: absolute path with trailing slash!
+    data_path = str(local_data_path.absolute()) + '/'
+    print(f"update metadata: set data_path to: '{data_path}'")
+    subprocess.run(
+        [
+            "psql", "-h", LOCAL_PG_HOST, "-p", str(LOCAL_PG_PORT), "-d", db_name, "-v", "ON_ERROR_STOP=1",
+            "-c", f"UPDATE ducklake_metadata SET value = '{data_path}' WHERE key = 'data_path'",
+        ],
+        check=True,
+    )
 
 
 # make sure r2 credentials are available in profile [r2-extensions] in ~/.aws/credentials
 def create_local_storage(local_data_path: Path):
-    print(f"downloading parquet files...", flush=True)
+    print("downloading parquet files...", flush=True)
     result = subprocess.run(
         [
             "aws", "s3", "sync",
@@ -55,43 +115,61 @@ def create_local_storage(local_data_path: Path):
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True
+        text=True,
     )
     print(result.stdout)
 
 
-def create_local_secret(sync_dir: Path):
-    abs_catalog_path = (sync_dir / DUCKDB_CATALOG).absolute()
+def create_local_secrets(db_name: str):
     with duckdb.connect() as con:
+        con.execute(f"""
+            CREATE OR REPLACE PERSISTENT SECRET pg_secret_local (
+                TYPE postgres,
+                HOST '{LOCAL_PG_HOST}',
+                PORT {LOCAL_PG_PORT},
+                DATABASE {db_name},
+                USER '{LOCAL_PG_USER}'
+            );
+        """)
         con.execute(f"""
             CREATE OR REPLACE PERSISTENT SECRET ducklake_secret_local (
                 TYPE ducklake,
-                METADATA_PATH '{abs_catalog_path}'
+                METADATA_PATH '',
+                METADATA_PARAMETERS MAP {{'TYPE': 'postgres', 'SECRET': 'pg_secret_local'}}
             );
         """)
-    print(f"updated 'ducklake_secret_local', it now points to: {abs_catalog_path}")
+    print(f"updated 'ducklake_secret_local', it now points at local postgres db '{db_name}'")
 
 
 def main():
+    validate_env()
     root_dir = Path('local_copy')
-    sync_dir = root_dir / f"dl_{datetime.now().strftime("%Y%m%d_%H%M%S")}"
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    sync_dir = root_dir / f"pg_{timestamp}"
     local_data_path = sync_dir / 'r2_data'
     local_data_path.mkdir(parents=True)
-    create_local_catalog(sync_dir, local_data_path)
+    db_name = f"ducklake_{timestamp}"
+
+    create_local_catalog(db_name, local_data_path)
     create_local_storage(local_data_path)
-    create_local_secret(sync_dir)
+    create_local_secrets(db_name)
 
     connection_str = (
-        "install ducklake; load ducklake;\n"
-        f"attach 'ducklake:{sync_dir}/{DUCKDB_CATALOG}' as my_ducklake; use my_ducklake;\n"
-        "-- show tables;\n\n"
-        "-- or:\n"
-        "-- attach 'ducklake:ducklake_secret_local' as my_ducklake; use my_ducklake;\n"
+        "-- to connect to the local ducklake:\n"
+        "install ducklake; load ducklake; install postgres; load postgres;\n"
+        "attach 'ducklake:ducklake_secret_local' as my_ducklake; use my_ducklake;\n\n"
+        "-- the secret contains credential for:\n"
+        f"--   data: {local_data_path}\n"
+        f"--   catalog: {db_name}\n\n"
+        "-- to list all ducklake catalogs in the cluster:\n"
+        "--   psql -h localhost -d postgres -c \"SELECT datname FROM pg_database WHERE datname LIKE 'ducklake\\_%' ORDER BY datname;\"\n\n"
+        "-- to drop it if it is no longer needed:\n"
+        f"--   dropdb -h localhost {db_name}"
     )
     connect_sql_file = sync_dir / 'connect.sql'
     connect_sql_file.write_text(connection_str)
 
-    print(f"finished creating local copy in dir: ./{sync_dir}")
+    print(f"finished creating local copy in dir: ./{sync_dir} , with catalog: {db_name}")
     print(f"to connect, use statements in ./{connect_sql_file}")
 
 
