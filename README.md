@@ -59,9 +59,12 @@ Data feeds are scripts that periodically store data in the ducklake
 data = my_func_to_fetch_data_from_somewhere()
 
 from utils.ducklake import DuckLakeConnection
-with DuckLakeConnection() as con:
+with DuckLakeConnection(dl_secret) as con:
     con.execute(<<< sql statments to create tables, add records, etc... >>>)
 ```
+- to locally test data feeds, the following the following make targets are available:
+  - `make sync_local` - makes a local copy from production (both catalog and data)
+  - `make run_feeds_local` - stores the fetched data in the local copy of the ducklake.
 
 ### defining sources
 The evidence front-end (see [./evidence/README.md](/evidence/README.md)) can not directly serve from the ducklake, therefore `.duckdb` files will be created as in-between step.
