@@ -15,5 +15,17 @@
     "tables": [
       "extension_downloads"
     ]
+  },
+  {
+    "name": "benchmarks",
+    "db_path": "./evidence/sources/benchmarks/benchmarks.duckdb",
+    "lake_secret": "benchmark_ducklake_secret",
+    "read_only": true,
+    "derived_tables": [
+      {
+        "name": "benchmark_geomean",
+        "sql_file": "./lake_queries/benchmark_geomean.sql"
+      }
+    ]
   }
 ]
