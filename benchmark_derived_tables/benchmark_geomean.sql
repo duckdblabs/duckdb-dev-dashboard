@@ -69,6 +69,9 @@ select
     r.benchmark,        -- the suite: tpch / tpcds / clickbench
     r.benchmark_name,   -- the config / storage backend: duckdb / ducklake / local / local-ducklake
     r.scale_factor,     -- NULL for clickbench - never filter this with IN
+    -- the page's scale-factor filter uses this, not scale_factor: clickbench has no scale factor,
+    -- and an IN filter over a NULL would silently drop every clickbench run.
+    coalesce('sf' || printf('%g', r.scale_factor), 'n/a') as scale_factor_label,
     -- one chart per (benchmark, scale_factor): a single string key makes the page's per-chart
     -- filtering NULL-safe. printf('%g') renders 100.0 as '100', not '100.0'.
     r.benchmark || coalesce(' @ sf' || printf('%g', r.scale_factor), '') as benchmark_series,
@@ -77,6 +80,9 @@ select
     r.binary_source,
     r.os,
     r.cpu_arch,
+    -- detected rather than supplied, so it should always be set - but a NULL slipping into an IN
+    -- filter would silently empty the dashboard, so the page filters on this label instead.
+    coalesce(r.cpu_arch, 'unknown') as cpu_arch_label,
     r.machine_type,
     -- machine_type is only set when the harness is run with --machine-type, and is NULL for every
     -- run currently in the lake. The page filters on this label instead: a NULL would be dropped

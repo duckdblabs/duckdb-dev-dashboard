@@ -24,7 +24,11 @@
     "derived_tables": [
       {
         "name": "benchmark_geomean",
-        "sql_file": "./lake_queries/benchmark_geomean.sql"
+        "sql_file": "./benchmark_derived_tables/benchmark_geomean.sql"
+      },
+      {
+        "name": "benchmark_query_times",
+        "sql_file": "./benchmark_derived_tables/benchmark_query_times.sql"
       }
     ]
   }
