@@ -128,12 +128,13 @@ order by run_timestamp
 -- Add to this list to add a reference line.
 --
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
--- narrowing the window should not make it vanish. The releases were each measured once, well
--- before most of the alpha runs.
+-- narrowing the window should not make it vanish. The releases were measured well before most of
+-- the alpha runs.
 select
   benchmark_series,
   duckdb_version,
-  median(geomean_seconds) as baseline_seconds
+  -- the latest run of that version
+  arg_max(geomean_seconds, run_timestamp) as baseline_seconds
 from benchmarks.geomean_runs
 where storage_type = 'duckdb'
   and duckdb_version in ('v1.4.5', 'v1.5.5')
@@ -143,6 +144,22 @@ where storage_type = 'duckdb'
   and cpu_arch_label in ${inputs.cpu_arch_select.value}
 group by benchmark_series, duckdb_version
 order by benchmark_series, duckdb_version
+```
+
+```sql chart_bounds
+-- A little headroom above each chart's tallest element.
+--
+-- Needed because a reference line exactly at the chart maximum is drawn on the plot border and is
+-- indistinguishable from it.
+select
+  benchmark_series,
+  max(y) * 1.08 as y_max
+from (
+  select benchmark_series, geomean_seconds  as y from ${geomean}
+  union all
+  select benchmark_series, baseline_seconds as y from ${version_baselines}
+)
+group by benchmark_series
 ```
 
 ```sql series_shown
@@ -161,7 +178,6 @@ Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so t
 `v2.0.0-alpha` series can be read against them. A version with no run for a given benchmark simply
 has no line there.
 
-<Grid cols=2>
 {#each series_shown as s}
   <LineChart
       data={geomean.filter(d => d.benchmark_series === s.benchmark_series)}
@@ -169,30 +185,31 @@ has no line there.
       xType=category
       showAllXAxisLabels=false
       y=geomean_seconds
+      yMax={chart_bounds.find(b => b.benchmark_series === s.benchmark_series)?.y_max}
       title={s.benchmark_series}
       yAxisTitle="geomean (seconds)"
       markers=true
       lineWidth=0
   >
       <!--
-        One ReferenceLine per baseline rather than one data-driven line over all of them, so the
-        labels can alternate between the left and right ends of the chart. The two baselines are
-        only a few percent apart on some benchmarks, and both labels in the same corner collide.
+        Back to a single data-driven line now that every label uses the same position: the split
+        into one component per baseline existed only so the label ends could alternate.
         hideValue drops the ' (0.0929)' suffix the component appends by default - the value is
         readable off the y-axis, and the version is what identifies the line.
+        emptySet=pass so a release with no run for this benchmark draws nothing instead of warning
+        (v1.4.5 has no DuckLake runs).
       -->
-      {#each version_baselines.filter(d => d.benchmark_series === s.benchmark_series) as b, i}
-        <ReferenceLine
-            y={b.baseline_seconds}
-            label={b.duckdb_version}
-            hideValue=true
-            lineType=dashed
-            labelPosition={i % 2 === 0 ? 'aboveStart' : 'aboveEnd'}
-        />
-      {/each}
+      <ReferenceLine
+          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series)}
+          y=baseline_seconds
+          label=duckdb_version
+          hideValue=true
+          lineType=dashed
+          labelPosition=belowEnd
+          emptySet=pass
+      />
   </LineChart>
 {/each}
-</Grid>
 
 ## Runs
 
