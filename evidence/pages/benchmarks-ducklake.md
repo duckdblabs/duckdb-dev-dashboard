@@ -122,6 +122,31 @@ where storage_type = 'ducklake'
 order by run_timestamp
 ```
 
+```sql version_baselines
+-- One baseline per pinned duckdb version per chart, drawn as a reference line.
+--
+-- Pinned deliberately rather than derived: these are the two releases currently worth comparing
+-- against, and a new release should not start drawing a line until someone decides it should.
+-- Add to this list to add a reference line.
+--
+-- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
+-- narrowing the window should not make it vanish. The releases were each measured once, well
+-- before most of the alpha runs.
+select
+  benchmark_series,
+  duckdb_version,
+  median(geomean_seconds) as baseline_seconds
+from benchmarks.geomean_runs
+where storage_type = 'ducklake'
+  and duckdb_version in ('v1.4.5', 'v1.5.5')
+  and benchmark in ${inputs.benchmark_select.value}
+  and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
+  and machine_label in ${inputs.machine_select.value}
+  and cpu_arch_label in ${inputs.cpu_arch_select.value}
+group by benchmark_series, duckdb_version
+order by benchmark_series, duckdb_version
+```
+
 ```sql series_shown
 select distinct benchmark_series
 from ${geomean}
@@ -133,17 +158,44 @@ order by benchmark_series
 One chart per benchmark and scale factor. The benchmarks span orders of magnitude, so they do not
 share an axis.
 
+Each dot is one run. They are deliberately not connected: consecutive runs are different commits,
+not a continuous measurement, so a line between them would imply a trend that the data does not
+support.
+
+Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
+`v2.0.0-alpha` series can be read against them. A version with no run for a given benchmark simply
+has no line there.
+
 <Grid cols=2>
 {#each series_shown as s}
   <LineChart
       data={geomean.filter(d => d.benchmark_series === s.benchmark_series)}
-      x=run_timestamp
+      x=run_date
+      xType=category
+      showAllXAxisLabels=false
       y=geomean_seconds
       title={s.benchmark_series}
       yAxisTitle="geomean (seconds)"
       markers=true
-      handleMissing=connect
-  />
+      lineWidth=0
+  >
+      <!--
+        One ReferenceLine per baseline rather than one data-driven line over all of them, so the
+        labels can alternate between the left and right ends of the chart. The two baselines are
+        only a few percent apart on some benchmarks, and both labels in the same corner collide.
+        hideValue drops the ' (0.0929)' suffix the component appends by default - the value is
+        readable off the y-axis, and the version is what identifies the line.
+      -->
+      {#each version_baselines.filter(d => d.benchmark_series === s.benchmark_series) as b, i}
+        <ReferenceLine
+            y={b.baseline_seconds}
+            label={b.duckdb_version}
+            hideValue=true
+            lineType=dashed
+            labelPosition={i % 2 === 0 ? 'aboveStart' : 'aboveEnd'}
+        />
+      {/each}
+  </LineChart>
 {/each}
 </Grid>
 
@@ -183,10 +235,14 @@ order by run_timestamp desc
 
 ## Per-query execution times
 
-The individual queries of a single run. `median (s)` and `mean (s)` are both computed over that
-query's warm runs: `mean` is what feeds the geomean above, and a gap between the two means those
-warm runs were noisy. `spread (s)` is slowest minus fastest warm run. Failed queries are listed
-with empty timings.
+The individual queries of a single run, each against the two release baselines. Every timing is a
+median over that query's warm runs.
+
+`delta vs ...` is the selected run minus the baseline, in seconds: **positive means the selected
+run is slower** than that release, negative means faster. Rows are sorted by the v1.5.5 delta, so
+regressions are at the top and improvements at the bottom. A blank baseline means that release has
+no run of this query - v1.4.5 has no DuckLake runs at all. Failed queries are listed with empty
+timings.
 
 ```sql run_options
 select
@@ -214,28 +270,65 @@ order by run_timestamp desc
 />
 
 ```sql query_times
+-- The selected run's queries, each next to the v1.5.5 and v1.4.5 medians for the same query.
+--
+-- Baselines are joined on (benchmark_series, query), not query alone: tpch and tpcds both have a
+-- q01, and matching on the query name by itself would compare unrelated queries.
+with selected as (
+  select *
+  from benchmarks.query_times
+  where storage_type = 'ducklake'
+    -- fall back to the newest run in run_options when nothing is selected yet, so the table is
+    -- never empty on first load. The nullifs cover an input that is unset rather than chosen.
+    and run_id = coalesce(
+          nullif(nullif('${inputs.run_select.value}', ''), 'undefined'),
+          (select run_id from ${run_options} order by run_timestamp desc limit 1))
+),
+baselines as (
+  select
+    benchmark_series,
+    query,
+    duckdb_version,
+    median(median_seconds) as baseline_seconds
+  from benchmarks.query_times
+  where storage_type = 'ducklake'
+    and duckdb_version in ('v1.4.5', 'v1.5.5')
+  group by benchmark_series, query, duckdb_version
+)
 select
-  query,
-  round(median_seconds, 4) as 'median (s)',
-  round(mean_seconds, 4)   as 'mean (s)',
-  round(slowest_seconds - fastest_seconds, 4) as 'spread (s)',
-  timed_runs as '# warm runs',
-  status
-from benchmarks.query_times
-where storage_type = 'ducklake'
-  -- fall back to the newest run in run_options when nothing is selected yet, so the table is
-  -- never empty on first load. The nullifs cover an input that is unset rather than chosen.
-  and run_id = coalesce(
-        nullif(nullif('${inputs.run_select.value}', ''), 'undefined'),
-        (select run_id from ${run_options} order by run_timestamp desc limit 1))
-order by median_seconds desc nulls last
+  s.query,
+  round(s.median_seconds, 4)                        as 'median (s)',
+  round(b55.baseline_seconds, 4)                    as 'v1.5.5 (s)',
+  round(b45.baseline_seconds, 4)                    as 'v1.4.5 (s)',
+  round(s.median_seconds - b55.baseline_seconds, 4) as 'delta vs v1.5.5',
+  round(s.median_seconds - b45.baseline_seconds, 4) as 'delta vs v1.4.5',
+  s.timed_runs                                      as '# warm runs',
+  s.status
+from selected s
+-- left joins: a release with no run of this query leaves the baseline and its delta blank
+-- rather than dropping the query from the table
+left join baselines b55
+  on  b55.benchmark_series = s.benchmark_series
+  and b55.query            = s.query
+  and b55.duckdb_version   = 'v1.5.5'
+left join baselines b45
+  on  b45.benchmark_series = s.benchmark_series
+  and b45.query            = s.query
+  and b45.duckdb_version   = 'v1.4.5'
+-- regressions first: biggest positive delta at the top, improvements at the bottom. Ordered on
+-- the v1.5.5 delta (the newer release) and falling back to v1.4.5 where v1.5.5 has no run of the
+-- query; a query with neither baseline sorts last rather than to the top as a NULL.
+order by coalesce("delta vs v1.5.5", "delta vs v1.4.5") desc nulls last,
+         s.median_seconds desc
 ```
 
 <DataTable data={query_times} rows=20 search=true>
     <Column id=query />
     <Column id='median (s)' />
-    <Column id='mean (s)' />
-    <Column id='spread (s)' />
+    <Column id='v1.5.5 (s)' />
+    <Column id='v1.4.5 (s)' />
+    <Column id='delta vs v1.5.5' />
+    <Column id='delta vs v1.4.5' />
     <Column id='# warm runs' />
     <Column id=status />
 </DataTable>
