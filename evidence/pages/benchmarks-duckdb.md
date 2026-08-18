@@ -11,24 +11,6 @@ across the benchmark's queries. Data comes from the benchmark results lake writt
 Other storage backends are on their own pages, so a slower backend never rescales a chart it does
 not belong to.
 
-## Runs
-
-A run with failed queries is still plotted, but its geomean covers fewer queries than a complete
-run - `# failed` is what tells them apart.
-
-<DataTable data={run_table} rows=25 search=true>
-    <Column id=benchmark_series />
-    <Column id=run_date />
-    <Column id=duckdb_version />
-    <Column id=commit />
-    <Column id='geomean (s)' />
-    <Column id='# ok' />
-    <Column id='# failed' />
-    <Column id=machine_label />
-    <Column id=cpu_arch_label />
-    <Column id=query_set />
-</DataTable>
-
 ```sql benchmark_options
 select benchmark from benchmarks.benchmark_list
 ```
@@ -165,11 +147,11 @@ share an axis.
 {/each}
 </Grid>
 
-<!--
-  This query stays below the filters even though its table renders at the top of the page: it
-  interpolates the filter inputs, which do not exist until their components are declared.
-  A sql block renders nothing itself, so its position does not affect the layout.
--->
+## Runs
+
+A run with failed queries is still plotted, but its geomean covers fewer queries than a complete
+run - `# failed` is what tells them apart.
+
 ```sql run_table
 select
   benchmark_series,
@@ -186,6 +168,18 @@ from ${geomean}
 order by run_timestamp desc
 ```
 
+<DataTable data={run_table} rows=25 search=true>
+    <Column id=benchmark_series />
+    <Column id=run_date />
+    <Column id=duckdb_version />
+    <Column id=commit />
+    <Column id='geomean (s)' />
+    <Column id='# ok' />
+    <Column id='# failed' />
+    <Column id=machine_label />
+    <Column id=cpu_arch_label />
+    <Column id=query_set />
+</DataTable>
 
 ## Per-query execution times
 
