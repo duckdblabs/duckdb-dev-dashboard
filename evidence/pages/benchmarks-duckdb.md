@@ -158,7 +158,7 @@ One chart per benchmark and scale factor.
 Each dot is one run concerning a different commit.
 
 Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
-alpha series can be read against them. A version with no run for a given benchmark simply
+`v2.0.0-alpha` series can be read against them. A version with no run for a given benchmark simply
 has no line there.
 
 <Grid cols=2>
@@ -233,8 +233,8 @@ order by run_timestamp desc
 The individual queries of a single run, each against the two release baselines. Every timing is a
 median over that query's warm runs.
 
-`delta vs ...` is the selected run minus the baseline, in seconds: **positive means the selected
-run is slower** than that release, negative means faster. Rows are sorted by the v1.5.5 delta, so
+`ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
+slower** than that release, below 1.0 means faster. Rows are sorted by the v1.5.5 ratio, so
 regressions are at the top and improvements at the bottom. A blank baseline means that release has
 no run of this query - v1.4.5 has no DuckLake runs at all. Failed queries are listed with empty
 timings.
@@ -295,12 +295,12 @@ select
   round(s.median_seconds, 4)                        as 'median (s)',
   round(b55.baseline_seconds, 4)                    as 'v1.5.5 (s)',
   round(b45.baseline_seconds, 4)                    as 'v1.4.5 (s)',
-  round(s.median_seconds - b55.baseline_seconds, 4) as 'delta vs v1.5.5',
-  round(s.median_seconds - b45.baseline_seconds, 4) as 'delta vs v1.4.5',
+  round(s.median_seconds / nullif(b55.baseline_seconds, 0), 3) as 'ratio vs v1.5.5',
+  round(s.median_seconds / nullif(b45.baseline_seconds, 0), 3) as 'ratio vs v1.4.5',
   s.timed_runs                                      as '# warm runs',
   s.status
 from selected s
--- left joins: a release with no run of this query leaves the baseline and its delta blank
+-- left joins: a release with no run of this query leaves the baseline and its ratio blank
 -- rather than dropping the query from the table
 left join baselines b55
   on  b55.benchmark_series = s.benchmark_series
@@ -310,10 +310,10 @@ left join baselines b45
   on  b45.benchmark_series = s.benchmark_series
   and b45.query            = s.query
   and b45.duckdb_version   = 'v1.4.5'
--- regressions first: biggest positive delta at the top, improvements at the bottom. Ordered on
--- the v1.5.5 delta (the newer release) and falling back to v1.4.5 where v1.5.5 has no run of the
+-- regressions first: biggest ratio at the top, improvements at the bottom. Ordered on
+-- the v1.5.5 ratio (the newer release) and falling back to v1.4.5 where v1.5.5 has no run of the
 -- query; a query with neither baseline sorts last rather than to the top as a NULL.
-order by coalesce("delta vs v1.5.5", "delta vs v1.4.5") desc nulls last,
+order by coalesce("ratio vs v1.5.5", "ratio vs v1.4.5") desc nulls last,
          s.median_seconds desc
 ```
 
@@ -322,8 +322,8 @@ order by coalesce("delta vs v1.5.5", "delta vs v1.4.5") desc nulls last,
     <Column id='median (s)' />
     <Column id='v1.5.5 (s)' />
     <Column id='v1.4.5 (s)' />
-    <Column id='delta vs v1.5.5' />
-    <Column id='delta vs v1.4.5' />
+    <Column id='ratio vs v1.5.5' />
+    <Column id='ratio vs v1.4.5' />
     <Column id='# warm runs' />
     <Column id=status />
 </DataTable>
