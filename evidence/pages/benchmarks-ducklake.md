@@ -263,10 +263,11 @@ The individual queries of a single run, each against the two release baselines. 
 median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
-slower** than that release, below 1.0 means faster. Rows are sorted by the v1.5.5 ratio, so
-regressions are at the top and improvements at the bottom. A blank baseline means that release has
-no run of this query - v1.4.5 has no DuckLake runs at all. Failed queries are listed with empty
-timings.
+slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
+0.9 green; the band in between is left uncoloured. Rows are sorted by the
+v1.5.5 ratio, so regressions are at the top and improvements at the bottom. A blank baseline means
+that release has no run of this query - v1.4.5 has no DuckLake runs at all. Failed queries are
+listed with empty timings.
 
 ```sql run_options
 select
@@ -324,8 +325,25 @@ select
   round(s.median_seconds, 4)                        as 'median (s)',
   round(b55.baseline_seconds, 4)                    as 'v1.5.5 (s)',
   round(b45.baseline_seconds, 4)                    as 'v1.4.5 (s)',
-  round(s.median_seconds / nullif(b55.baseline_seconds, 0), 3) as 'ratio vs v1.5.5',
-  round(s.median_seconds / nullif(b45.baseline_seconds, 0), 3) as 'ratio vs v1.4.5',
+  -- Rounded to the 2 decimals the table actually displays, not to 3.
+  --
+  -- The flags below compare against this same rounded value, so the colour can never disagree
+  -- with the number in the cell. At 3 decimals it did: 1.101 and 1.100 both print as "1.10" but
+  -- only the first is > 1.1, so one 1.10 came out red and the next did not.
+  round(s.median_seconds / nullif(b55.baseline_seconds, 0), 2) as 'ratio vs v1.5.5',
+  round(s.median_seconds / nullif(b45.baseline_seconds, 0), 2) as 'ratio vs v1.4.5',
+  -- Colour flags for the two ratio columns, not shown in the table themselves: -1 paints the
+  -- cell green, 1 paints it red, NULL leaves it with the plain cell background.
+  --
+  -- NULL deliberately covers two different cases at once - a ratio inside the neutral 0.9-1.1
+  -- band, and a query the release has no run of. Both should render uncoloured, and a colorscale
+  -- maps a null scale value to the table background, so one NULL expresses both.
+  --
+  -- Flags rather than colouring on the ratio itself because a colorscale interpolates: scaling on
+  -- the raw ratio would tint everything between 0.9 and 1.1 some shade of pink or green instead
+  -- of leaving it alone.
+  case when "ratio vs v1.5.5" > 1.1 then 1 when "ratio vs v1.5.5" < 0.9 then -1 end as 'v1.5.5 color',
+  case when "ratio vs v1.4.5" > 1.1 then 1 when "ratio vs v1.4.5" < 0.9 then -1 end as 'v1.4.5 color',
   s.timed_runs                                      as '# warm runs',
   s.status
 from selected s
@@ -346,13 +364,52 @@ order by coalesce("ratio vs v1.5.5", "ratio vs v1.4.5") desc nulls last,
          s.median_seconds desc
 ```
 
+<!--
+  The two ratio columns are coloured off their companion `... color` flag column rather than off
+  their own value - see the query above for why.
+
+  Each colorScale entry is a `[light appearance, dark appearance]` pair, so the tints follow the
+  theme switcher rather than being pinned to one appearance - a light wash that reads on white
+  would be a glare on the dark background, and vice versa. Order matches colorBreakpoints: green
+  for the -1 flag, red for +1. They are deliberately washed out; the table is read by scanning the
+  numbers, and the fill is only there to say where to look.
+
+  colorMin/colorMax are set explicitly because the component otherwise derives the scale domain
+  from the flag column and gives up when every flag happens to be identical - which is exactly the
+  run where every query regressed, i.e. the one that most needs colouring.
+
+  fmt=num2 pins the display to the 2 decimals the query rounds to. Left to itself the table picks
+  the decimal count from the column's median, so a run where most queries got faster (median below
+  1) would start showing 3 - and the extra digit would be a rounding artefact, not a measurement.
+
+  data is the query object itself, deliberately: search=true pushes the search down into SQL and
+  is silently dropped if it is handed plain rows instead.
+-->
 <DataTable data={query_times} rows=20 search=true>
     <Column id=query />
     <Column id='median (s)' />
     <Column id='v1.5.5 (s)' />
     <Column id='v1.4.5 (s)' />
-    <Column id='ratio vs v1.5.5' />
-    <Column id='ratio vs v1.4.5' />
+    <Column
+        id='ratio vs v1.5.5'
+        fmt=num2
+        contentType=colorscale
+        scaleColumn='v1.5.5 color'
+        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
+        colorBreakpoints={[-1, 1]}
+        colorMin={-1}
+        colorMax={1}
+    />
+    <Column
+        id='ratio vs v1.4.5'
+        fmt=num2
+        contentType=colorscale
+        scaleColumn='v1.4.5 color'
+        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
+        colorBreakpoints={[-1, 1]}
+        colorMin={-1}
+        colorMax={1}
+    />
     <Column id='# warm runs' />
     <Column id=status />
 </DataTable>
