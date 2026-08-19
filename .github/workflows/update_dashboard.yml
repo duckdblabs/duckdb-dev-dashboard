@@ -23,6 +23,11 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+  # benchmark results lake (read-only): s3://duckdb-benchmark-lake, eu-central-1
+  # read by 'make generate_sources' in the build job, for the benchmarks dashboard
+  BENCHMARK_LAKE_S3_KEY_ID: ${{ secrets.BENCHMARK_LAKE_S3_KEY_ID }}
+  BENCHMARK_LAKE_S3_SECRET: ${{ secrets.BENCHMARK_LAKE_S3_SECRET }}
+
   # cloudflare (same as ducklake storage)
   CF_KEY_ID: ${{ secrets.CF_KEY_ID }}
   CF_KEY_SECRET: ${{ secrets.CF_KEY_SECRET }}

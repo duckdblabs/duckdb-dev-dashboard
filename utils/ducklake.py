@@ -5,14 +5,20 @@ import tempfile
 
 
 class DuckLakeConnection:
-    def __init__(self, connection_string=''):
+    def __init__(self, connection_string='', read_only: bool = False):
         self.ducklake_db_alias = 'my_ducklake'
         self.catalog = f"__ducklake_metadata_{self.ducklake_db_alias}"
         self.connection_string = connection_string
+        self.read_only = read_only
 
     def __enter__(self):
         self.con = duckdb.connect()
-        self.con.execute(f"ATTACH 'ducklake:{self.connection_string}' AS {self.ducklake_db_alias} (AUTOMATIC_MIGRATION)")
+        # READ_ONLY and AUTOMATIC_MIGRATION are mutually exclusive - a migration is a
+        # catalog write - so this is an either/or, not a combination.
+        attach_options = "READ_ONLY" if self.read_only else "AUTOMATIC_MIGRATION"
+        self.con.execute(
+            f"ATTACH 'ducklake:{self.connection_string}' AS {self.ducklake_db_alias} ({attach_options})"
+        )
         self.con.execute(f"USE {self.ducklake_db_alias}")
         return self
 

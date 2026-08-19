@@ -56,11 +56,56 @@ Q_DUCKLAKE_SECRET = f"""
     """
 
 
+# ---------------------------------------------------------------------------
+# benchmark results lake (read-only)
+#
+# A second, independent DuckLake, written by scripts/engineering/benchmark in duckdb-internal.
+# Its catalog is a DuckDB *database file* published to S3, not a postgres database - hence no
+# METADATA_PARAMETERS, and readers must attach it READ_ONLY (a remote database file cannot be
+# written).
+#
+# BENCHMARK_LAKE_S3_KEY_ID and BENCHMARK_LAKE_S3_SECRET are required (see validate_env), so a
+# missing credential fails 'make secrets' loudly rather than leaving the benchmarks dashboard
+# silently stale. The paths and region below have defaults and only need setting to point at a
+# different bucket.
+# ---------------------------------------------------------------------------
+
+BENCHMARK_LAKE_BUCKET = os.getenv('BENCHMARK_LAKE_BUCKET', 's3://duckdb-benchmark-lake')
+BENCHMARK_LAKE_CATALOG = os.getenv('BENCHMARK_LAKE_CATALOG', f'{BENCHMARK_LAKE_BUCKET}/results.ducklake')
+BENCHMARK_LAKE_DATA_PATH = os.getenv('BENCHMARK_LAKE_DATA_PATH', f'{BENCHMARK_LAKE_BUCKET}/data/')
+BENCHMARK_LAKE_REGION = os.getenv('BENCHMARK_LAKE_REGION', 'eu-central-1')
+
+# s3 secret for the benchmark lake (catalog file and data files are in the same bucket)
+# note: SCOPE is not optional here; an unscoped s3 secret becomes the default for every s3:// path
+# in the process. 'r2_secret' is scoped to an r2:// path, so the two never compete either way.
+Q_BENCHMARK_S3_SECRET = f"""
+    CREATE OR REPLACE PERSISTENT SECRET benchmark_s3_secret (
+        TYPE s3,
+        PROVIDER config,
+        KEY_ID '{os.getenv('BENCHMARK_LAKE_S3_KEY_ID')}',
+        SECRET '{os.getenv('BENCHMARK_LAKE_S3_SECRET')}',
+        REGION '{BENCHMARK_LAKE_REGION}',
+        SCOPE '{BENCHMARK_LAKE_BUCKET}'
+    )
+    """
+
+# ducklake connection secret (note: uses 'benchmark_s3_secret' defined above for bucket access)
+Q_BENCHMARK_DUCKLAKE_SECRET = f"""
+    CREATE OR REPLACE PERSISTENT SECRET benchmark_ducklake_secret (
+        TYPE ducklake,
+        METADATA_PATH '{BENCHMARK_LAKE_CATALOG}',
+        DATA_PATH '{BENCHMARK_LAKE_DATA_PATH}'
+    )
+    """
+
+
 def create_ducklake_secrets():
     with duckdb.connect() as con:
         con.execute(Q_CATALOG_SECRET)
         con.execute(Q_STORAGE_SECRET)
         con.execute(Q_DUCKLAKE_SECRET)
+        con.execute(Q_BENCHMARK_S3_SECRET)
+        con.execute(Q_BENCHMARK_DUCKLAKE_SECRET)
 
 
 def validate_env():
@@ -72,6 +117,8 @@ def validate_env():
         "DUCKLAKE_CATALOG_PG_PASSWORD",
         "DUCKLAKE_CATALOG_PG_HOST",
         "DUCKLAKE_CATALOG_PG_USER",
+        "BENCHMARK_LAKE_S3_KEY_ID",
+        "BENCHMARK_LAKE_S3_SECRET",
     ]
     for env_var in required_env_vars:
         if env_var not in os.environ.keys():

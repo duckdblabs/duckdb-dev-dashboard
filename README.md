@@ -23,6 +23,31 @@ The tech stack:
 - for convenience and local testing, add the vars mentioned above to a `.env` file (gitignored) and run `make secrets` to create [persistent secrets](https://duckdb.org/docs/stable/configuration/secrets_manager) to connect to the ducklake. Note that secrets are stored in `~/.duckdb/stored_secrets`.
 - note that the front end is hosted on GitHub pages: https://docs.evidence.dev/deployment/self-host/github-pages
 
+### Second lake: benchmark results (read-only)
+The benchmarks dashboard reads a *second*, independent DuckLake, owned by the benchmark harness
+(`scripts/engineering/benchmark` in `duckdb-internal`):
+- catalog: `s3://duckdb-benchmark-lake/results.ducklake` — a DuckDB **database file**, not postgres
+- data: `s3://duckdb-benchmark-lake/data/`, region `eu-central-1`
+
+Because the catalog is a remote database file it can only be attached `READ_ONLY`; this repo never
+writes to it. Set the following vars (read-only S3 credentials are sufficient, and are all this repo
+should hold):
+- `BENCHMARK_LAKE_S3_KEY_ID`
+- `BENCHMARK_LAKE_S3_SECRET`
+
+Both are required: `make secrets` fails if either is missing, so a missing credential surfaces there
+rather than leaving the benchmarks dashboard silently stale. `make secrets` creates
+`benchmark_s3_secret` and `benchmark_ducklake_secret` from them. The paths and region have defaults
+and only need setting to point at a different bucket: `BENCHMARK_LAKE_BUCKET`,
+`BENCHMARK_LAKE_CATALOG`, `BENCHMARK_LAKE_DATA_PATH`, `BENCHMARK_LAKE_REGION`.
+
+To connect to it manually:
+```sql
+ATTACH 'ducklake:benchmark_ducklake_secret' AS bench (READ_ONLY);
+USE bench;
+SELECT benchmark, benchmark_name, scale_factor, count(*) FROM runs WHERE NOT is_test GROUP BY ALL;
+```
+
 ### Testing set-up: Connecting to the ducklake
 - to connect to the ducklake with the credentials created above:
 ```sql
@@ -78,6 +103,11 @@ Steps to define a new source:
     - run `make dev` to spawn the front-end (make sure evidence is installed locally, see [./evidence/README.md](/evidence/README.md))
     - following the steps in the link above will create a subdirectory under `./evidence/sources`
 - add the source to `evidence/sources/sources.json`, to specify which tables from the ducklake are needed.
+    - a source may also read from a *different* lake, and materialize an aggregate instead of copying a table whole:
+        - `lake_secret` - name of the ducklake secret to attach (default: `ducklake_secret`)
+        - `read_only` - attach the lake `READ_ONLY` instead of with `AUTOMATIC_MIGRATION` (default: `false`)
+        - `derived_tables` - `[{name, sql_file}]`; the SQL file is run against the lake and its result is stored as table `name`. Use this when the raw table is far too large to ship to the browser: the benchmarks source turns one row per query per warm run per metric into one row per benchmark run. These SQL files live in `./benchmark_derived_tables/`, deliberately *outside* `evidence/sources/` - evidence treats every `.sql` under a source directory as a source query.
+    - to refresh only some sources (e.g. when you do not have credentials for every lake): `python3 -m evidence.sources.generate_sources ci_metrics extension_downloads`
 - run `make generate_sources`, this should create the `.duckdb` file (which is .gitignored, but needed for local testing).
 - add one or more `.sql` files to select the data relevant for the dashboard
 
