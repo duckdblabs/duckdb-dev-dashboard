@@ -178,6 +178,12 @@ Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so t
 `v2.0.0-alpha` series can be read against them. A version with no run for a given benchmark simply
 has no line there.
 
+<!--
+  sort=false keeps the points in the order the geomean query returns them (by run_timestamp).
+  Evidence's default sort=true reorders the rows by the *y* value, descending, whenever the x
+  column is a string - and run_date is a varchar - which scrambles the dates along the category
+  axis.
+-->
 {#each series_shown as s}
   <LineChart
       data={geomean.filter(d => d.benchmark_series === s.benchmark_series)}
@@ -190,6 +196,7 @@ has no line there.
       yAxisTitle="geomean (seconds)"
       markers=true
       lineWidth=0
+      sort=false
   >
       <!--
         Back to a single data-driven line now that every label uses the same position: the split
