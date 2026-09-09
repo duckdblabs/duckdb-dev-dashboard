@@ -14,8 +14,10 @@ maintain:
 	duckdb -f utils/maintenance.sql
 
 # generates duckdb files from ducklake (required by evidence)
+# only 'benchmarks': the lake behind ci_metrics and extension_downloads is gone (deleted
+# CloudFlare account), so attaching it would fail the build. drop the arg to restore them.
 generate_sources:
-	python3 -m evidence.sources.generate_sources
+	python3 -m evidence.sources.generate_sources benchmarks
 
 # build the front-end; this creates a parquet file per table in duckdb file
 build:

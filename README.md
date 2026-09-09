@@ -8,6 +8,20 @@ The tech stack:
 - hosted: Github Pages
 - updates: periodically via Github actions cron
 
+> **Note: the `ci-stats` and `extension-downloads` pages are inactive for the time being.**
+> They read a ducklake whose storage lived on a Cloudflare R2 account that has been deleted, so
+> there is no data left to serve. Nothing was removed - the pages, sources and feeds are all still
+> here, only switched off:
+> - `evidence/pages/ci-stats.md.disabled` and `evidence/pages/extension-downloads.md.disabled` -
+>   renamed, so evidence does not build them as routes
+> - `evidence/sources/{ci_metrics,extension_downloads}/connection.yaml.disabled` - renamed, so
+>   evidence skips those source directories
+> - `make generate_sources` passes `benchmarks`, so the dead lake is never attached
+> - both entries in `FEEDS` (`feeds/run_feeds.py`), both links in `evidence/pages/index.md` and
+>   `make maintain` in `maintain_dashboard.yml` are commented out
+>
+> The benchmarks dashboards are unaffected: they read a separate lake on S3 (see below).
+
 ## Setup
 
 ### Create a postgres-r2-ducklake with DuckDB CLI
