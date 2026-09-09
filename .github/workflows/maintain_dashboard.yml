@@ -36,4 +36,6 @@ jobs:
           export PATH='/home/runner/.duckdb/cli/latest':$PATH
           python3 -m pip install -r requirements.txt
           make secrets
-          make maintain
+          # disabled: 'make maintain' attaches the ducklake on the CloudFlare
+          # account was deleted, so it fails.
+          # make maintain

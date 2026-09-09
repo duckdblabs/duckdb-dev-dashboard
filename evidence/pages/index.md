@@ -2,8 +2,8 @@
 title: Welcome to Duckdb Dev Dashboard!
 ---
 ## Available Dashboards
-- [CI stats](ci-stats)
-- [Extension Downloads](extension-downloads)
+<!-- - [CI stats](ci-stats) -->
+<!-- - [Extension Downloads](extension-downloads) -->
 - [Benchmarks - DuckDB storage](benchmarks-duckdb)
 - [Benchmarks - DuckLake storage](benchmarks-ducklake)
 

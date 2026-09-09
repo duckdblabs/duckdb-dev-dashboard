@@ -70,7 +70,7 @@ Q_DUCKLAKE_SECRET = f"""
 # different bucket.
 # ---------------------------------------------------------------------------
 
-BENCHMARK_LAKE_BUCKET = os.getenv('BENCHMARK_LAKE_BUCKET', 's3://duckdb-benchmark-lake')
+BENCHMARK_LAKE_BUCKET = os.getenv('BENCHMARK_LAKE_BUCKET', 's3://duckdb-benchmark-lake-847122343688')
 BENCHMARK_LAKE_CATALOG = os.getenv('BENCHMARK_LAKE_CATALOG', f'{BENCHMARK_LAKE_BUCKET}/results.ducklake')
 BENCHMARK_LAKE_DATA_PATH = os.getenv('BENCHMARK_LAKE_DATA_PATH', f'{BENCHMARK_LAKE_BUCKET}/data/')
 BENCHMARK_LAKE_REGION = os.getenv('BENCHMARK_LAKE_REGION', 'eu-central-1')
