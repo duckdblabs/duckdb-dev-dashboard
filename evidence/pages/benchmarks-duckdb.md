@@ -282,7 +282,7 @@ order by run_timestamp desc
 <Dropdown
     name=run_select
     data={run_options}
-    value=run_id
+    value=run_label
     label=run_label
     defaultValue={run_options?.[0]?.run_id}
     title="Select run"
