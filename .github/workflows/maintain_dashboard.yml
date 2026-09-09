@@ -19,7 +19,7 @@ env:
   DUCKLAKE_CATALOG_PG_USER: ${{ secrets.DUCKLAKE_CATALOG_PG_USER }}
   DUCKLAKE_CATALOG_PG_PASSWORD: ${{ secrets.DUCKLAKE_CATALOG_PG_PASSWORD }}
 
-  # benchmark results lake (read-only): s3://duckdb-benchmark-lake, eu-central-1
+  # benchmark results lake (read-only): s3://duckdb-benchmark-lake-847122343688, eu-central-1
   # not used by 'make maintain', but required by 'make secrets'
   BENCHMARK_LAKE_S3_KEY_ID: ${{ secrets.BENCHMARK_LAKE_S3_KEY_ID }}
   BENCHMARK_LAKE_S3_SECRET: ${{ secrets.BENCHMARK_LAKE_S3_SECRET }}

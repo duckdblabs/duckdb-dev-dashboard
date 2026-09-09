@@ -40,8 +40,8 @@ The tech stack:
 ### Second lake: benchmark results (read-only)
 The benchmarks dashboard reads a *second*, independent DuckLake, owned by the benchmark harness
 (`scripts/engineering/benchmark` in `duckdb-internal`):
-- catalog: `s3://duckdb-benchmark-lake/results.ducklake` — a DuckDB **database file**, not postgres
-- data: `s3://duckdb-benchmark-lake/data/`, region `eu-central-1`
+- catalog: `s3://duckdb-benchmark-lake-847122343688/results.ducklake` — a DuckDB **database file**, not postgres
+- data: `s3://duckdb-benchmark-lake-847122343688/data/`, region `eu-central-1`
 
 Because the catalog is a remote database file it can only be attached `READ_ONLY`; this repo never
 writes to it. Set the following vars (read-only S3 credentials are sufficient, and are all this repo
