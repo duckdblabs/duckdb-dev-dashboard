@@ -1,6 +1,6 @@
 -- Geometric mean of per-query execution time, one row per benchmark run.
 --
--- Runs against the benchmark results lake (s3://duckdb-benchmark-lake).
+-- Runs against the benchmark results lake (s3://duckdb-benchmark-lake-847122343688).
 --
 -- Two levels of aggregation, deliberately different:
 --   1. MEAN over the warm runs of one query -> one representative time per (run_id, query).
