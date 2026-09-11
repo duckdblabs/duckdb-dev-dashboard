@@ -11,6 +11,9 @@ across the benchmark's queries. Data comes from the benchmark results lake writt
 Other storage backends are on their own pages, so a slower backend never rescales a chart it does
 not belong to.
 
+The filters in the **Filters** section below control everything on this page: the charts and
+their baseline lines, the runs table, and the per-query execution times.
+
 ```sql benchmark_options
 select benchmark from benchmarks.benchmark_list
 ```
@@ -355,8 +358,8 @@ order by merge_commit_date desc, run_timestamp desc
 
 ## Per-query execution times
 
-The individual queries of a single run, each against the two release baselines. Every timing is a
-median over that query's warm runs.
+The individual queries of a single run, each against the two release baselines on the selected
+machine type and CPU architecture. Every timing of the release baselines is a median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
 slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
@@ -401,10 +404,8 @@ with selected as (
   select *
   from benchmarks.query_times
   where storage_type = 'ducklake'
-    -- fall back to the newest run in run_options when nothing is selected yet, so the table is
-    -- never empty on first load. The nullifs cover an input that is unset rather than chosen.
     and run_id = coalesce(
-          nullif(nullif('${inputs.run_select.value}', ''), 'undefined'),
+          (select run_id from ${run_options} where run_id = '${inputs.run_select.value}'),
           (select run_id from ${run_options} order by run_timestamp desc limit 1))
 ),
 baselines as (
@@ -416,6 +417,8 @@ baselines as (
   from benchmarks.query_times
   where storage_type = 'ducklake'
     and duckdb_version in ('v1.4.5', 'v1.5.5')
+    and machine_label  = '${inputs.machine_select}'
+    and cpu_arch_label = '${inputs.cpu_arch_select}'
   group by benchmark_series, query, duckdb_version
 )
 select
