@@ -179,15 +179,14 @@ order by merge_commit_date, run_timestamp
 -- against, and a new release should not start drawing a line until someone decides it should.
 -- Add to this list to add a reference line.
 --
--- We take the median over the release runs rather than the latest one, so a single unusual run cannot move the line.
---
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
 -- narrowing the window should not make it vanish. The releases were measured well before most of
 -- the alpha runs. The window only decides which OS and query sets are on the chart to match.
 select
   r.benchmark_series,
   r.duckdb_version,
-  median(r.geomean_seconds) as baseline_seconds
+  -- the latest matching run of that version
+  arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
 from benchmarks.geomean_runs r
 where r.storage_type = 'ducklake'
   and r.duckdb_version in ('v1.4.5', 'v1.5.5')
@@ -239,8 +238,8 @@ not a continuous measurement, so a line between them would imply a trend that th
 support.
 
 Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
-`v2.0.0-alpha` series can be read against them. Each line is the median of that release's runs on
-the same machine, OS and query set as the runs in the chart. A version with no such run simply has
+`v2.0.0-alpha` series can be read against them. Each line is that release's latest run on the same
+machine, OS and query set as the runs in the chart. A version with no such run simply has
 no line there.
 
 <!--
