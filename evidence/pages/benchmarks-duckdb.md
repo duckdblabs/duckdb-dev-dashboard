@@ -40,8 +40,8 @@ order by cpu_arch_label
 ```
 
 ```sql date_options
--- bounds the date picker to the merge dates of this page's runs, so the presets ('Last 90 Days')
--- count back from the newest benchmarked commit rather than from today
+-- starts the date picker at this page's first benchmarked commit, so 'All Time' does not reach
+-- back to 1970. Only the start is taken from here: the DateRange pins the end to today.
 select merge_commit_date::date as merge_commit_date
 from benchmarks.geomean_runs
 where storage_type = 'duckdb'
@@ -54,6 +54,7 @@ where storage_type = 'duckdb'
     name=date_select
     data={date_options}
     dates=merge_commit_date
+    end={new Date()}
     defaultValue={'Last 90 Days'}
     title="Select time window"
     description="Select time window"
@@ -98,8 +99,7 @@ where storage_type = 'duckdb'
 <br>
 <!--
   Single-select, so the charts never mix timings from different hardware. A ButtonGroup selects
-  nothing without a defaultValue - and every query would then match no runs - so both are pinned
-  to the machine with the most recent runs.
+  nothing without a defaultValue - and every query would then match no runs.
 -->
 <ButtonGroup
     name=machine_select
@@ -122,8 +122,9 @@ where storage_type = 'duckdb'
 <!-- dataLoaded: without it the warning flashes while the query is still running -->
 {#if geomean.dataLoaded && geomean.length === 0}
 <Alert status="warning">
-No runs match these filters. Each machine has a single CPU architecture, so a machine paired with
-a different architecture leaves nothing to show.
+No runs match these filters. Either none of the commits merged in the selected time window has
+been benchmarked yet, or the selected machine and CPU architecture do not go together: each
+machine has a single CPU architecture.
 </Alert>
 {/if}
 
@@ -162,8 +163,8 @@ where storage_type = 'duckdb'
   -- The end bound is two days past the input on purpose. The picker emits bare dates, converted
   -- via UTC, so east of UTC it reports each day as the day before - picking Sep 3 sends
   -- '2026-09-02'. One day compensates for that, the other makes the end day inclusive. The window
-  -- can come out a day wider than the picker shows, but never narrower; with the picker bounded
-  -- to the newest merge date, narrower would drop exactly the newest commit.
+  -- can come out a day wider than the picker shows, but never narrower; narrower would drop the
+  -- commits merged on the window's last day.
   and merge_commit_date >= '${inputs.date_select.start}'
   and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
 order by merge_commit_date, run_timestamp
@@ -176,13 +177,7 @@ order by merge_commit_date, run_timestamp
 -- against, and a new release should not start drawing a line until someone decides it should.
 -- Add to this list to add a reference line.
 --
--- Only release runs comparable to a run plotted in the same chart count: same machine, CPU, OS
--- and query set (queries_sha). Anything else is a different measurement - the c6id release runs
--- of 2026-09-09 were on Windows with an edited query set, and they put the lines at up to 2x the
--- Linux runs they sat next to.
---
--- The median over those runs rather than the latest one, so a single unusual run cannot move the
--- line.
+-- We take the median over the release runs rather than the latest one, so a single unusual run cannot move the line.
 --
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
 -- narrowing the window should not make it vanish. The releases were measured well before most of
@@ -278,22 +273,6 @@ no line there.
       lineWidth=0
       sort=false
   >
-      <!--
-        One component per release, so each gets its own colour and label side. The two releases
-        land within a few pixels of each other on most charts, and with one shared belowEnd
-        position the later label covered the earlier one completely - Evidence does not move
-        overlapping reference labels apart.
-        v1.4.5 is labelled above its line and v1.5.5 below: v1.5.5 is the faster of the two on
-        every chart so far, so the labels move apart. Should that ever flip, they would move
-        towards each other again, and the colours are what still tells the lines apart.
-        Each colour is a [light, dark] pair so it stays readable under the theme switcher (label
-        contrast >= 5:1 on both backgrounds); orange and teal also stay distinct from each other
-        under red-green colour blindness.
-        hideValue drops the ' (0.0929)' suffix the component appends by default - the value is
-        readable off the y-axis, and the version is what identifies the line.
-        emptySet=pass so a release with no matching run for this chart draws nothing instead of
-        warning.
-      -->
       <ReferenceLine
           data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.4.5')}
           y=baseline_seconds
