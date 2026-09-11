@@ -20,17 +20,39 @@ select scale_factor_label from benchmarks.scale_factor_list
 ```
 
 ```sql machine_options
-select machine_label from benchmarks.machine_list
+-- only machines this page has runs with a merge date for (the date filter drops the rest): the
+-- filter is single-select, so an option without runs would empty the whole page
+select distinct machine_label
+from benchmarks.geomean_runs
+where storage_type = 'ducklake'
+  and merge_commit_date is not null
+order by machine_label
 ```
 
 ```sql cpu_arch_options
-select cpu_arch_label from benchmarks.cpu_arch_list
+-- scoped like machine_options, for the same reason
+select distinct cpu_arch_label
+from benchmarks.geomean_runs
+where storage_type = 'ducklake'
+  and merge_commit_date is not null
+order by cpu_arch_label
+```
+
+```sql date_options
+-- bounds the date picker to the merge dates of this page's runs, so the presets ('Last 90 Days')
+-- count back from the newest benchmarked commit rather than from today
+select merge_commit_date::date as merge_commit_date
+from benchmarks.geomean_runs
+where storage_type = 'ducklake'
+  and merge_commit_date is not null
 ```
 
 ### Filters
 
 <DateRange
     name=date_select
+    data={date_options}
+    dates=merge_commit_date
     defaultValue={'Last 90 Days'}
     title="Select time window"
     description="Select time window"
@@ -73,25 +95,36 @@ where storage_type = 'ducklake'
 />
 </div>
 <br>
-<Dropdown
+<!--
+  Single-select, so the charts never mix timings from different hardware. A ButtonGroup selects
+  nothing without a defaultValue - and every query would then match no runs - so both are pinned
+  to the only machine with DuckLake runs that have a merge date.
+-->
+<ButtonGroup
     name=machine_select
     data={machine_options}
     value=machine_label
-    selectAllByDefault=true
-    multiple=true
+    defaultValue="unspecified"
     title="Select machine type"
-    description="Select machine type"
+    description="Timings from different machines are not comparable"
 />
 <br>
-<Dropdown
+<ButtonGroup
     name=cpu_arch_select
     data={cpu_arch_options}
     value=cpu_arch_label
-    selectAllByDefault=true
-    multiple=true
+    defaultValue="x86_64"
     title="Select CPU architecture"
     description="Timings from different CPU architectures are not comparable"
 />
+
+<!-- dataLoaded: without it the warning flashes while the query is still running -->
+{#if geomean.dataLoaded && geomean.length === 0}
+<Alert status="warning">
+No runs match these filters. Each machine has a single CPU architecture, so a machine paired with
+a different architecture leaves nothing to show.
+</Alert>
+{/if}
 
 ```sql geomean
 select
@@ -99,7 +132,8 @@ select
   benchmark,
   scale_factor_label,
   run_timestamp,
-  run_date,
+  merge_commit_date,
+  merge_date,
   geomean_seconds,
   duckdb_version,
   duckdb_commit_sha[:8] as commit,
@@ -109,17 +143,29 @@ select
   queries_attempted,
   queries_failed,
   is_complete,
-  queries_sha[:8] as query_set
+  queries_sha[:8] as query_set,
+  -- not displayed: version_baselines matches release runs to the plotted runs on these
+  os,
+  queries_sha
 from benchmarks.geomean_runs
 where storage_type = 'ducklake'
   and benchmark in ${inputs.benchmark_select.value}
   -- the scale-factor filter only bites on benchmarks that have one; clickbench (scale_factor
   -- NULL) is exempt, so narrowing to sf100 does not make it disappear
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and machine_label in ${inputs.machine_select.value}
-  and cpu_arch_label in ${inputs.cpu_arch_select.value}
-  and run_timestamp between '${inputs.date_select.start}' and '${inputs.date_select.end}'
-order by run_timestamp
+  and machine_label = '${inputs.machine_select}'
+  and cpu_arch_label = '${inputs.cpu_arch_select}'
+  -- the date filter is on the commit's merge date, not on when it was benchmarked. Release runs
+  -- have no merge date and are deliberately excluded; they remain as the baselines below.
+  --
+  -- The end bound is two days past the input on purpose. The picker emits bare dates, converted
+  -- via UTC, so east of UTC it reports each day as the day before - picking Sep 3 sends
+  -- '2026-09-02'. One day compensates for that, the other makes the end day inclusive. The window
+  -- can come out a day wider than the picker shows, but never narrower; with the picker bounded
+  -- to the newest merge date, narrower would drop exactly the newest commit.
+  and merge_commit_date >= '${inputs.date_select.start}'
+  and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+order by merge_commit_date, run_timestamp
 ```
 
 ```sql version_baselines
@@ -129,23 +175,37 @@ order by run_timestamp
 -- against, and a new release should not start drawing a line until someone decides it should.
 -- Add to this list to add a reference line.
 --
+-- Only release runs comparable to a run plotted in the same chart count: same machine, CPU, OS
+-- and query set (queries_sha). Anything else is a different measurement - on the DuckDB page, the
+-- c6id release runs of 2026-09-09 were on Windows with an edited query set, and they put the lines
+-- at up to 2x the Linux runs they sat next to.
+--
+-- The median over those runs rather than the latest one, so a single unusual run cannot move the
+-- line.
+--
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
 -- narrowing the window should not make it vanish. The releases were measured well before most of
--- the alpha runs.
+-- the alpha runs. The window only decides which OS and query sets are on the chart to match.
 select
-  benchmark_series,
-  duckdb_version,
-  -- the latest run of that version
-  arg_max(geomean_seconds, run_timestamp) as baseline_seconds
-from benchmarks.geomean_runs
-where storage_type = 'ducklake'
-  and duckdb_version in ('v1.4.5', 'v1.5.5')
-  and benchmark in ${inputs.benchmark_select.value}
-  and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and machine_label in ${inputs.machine_select.value}
-  and cpu_arch_label in ${inputs.cpu_arch_select.value}
-group by benchmark_series, duckdb_version
-order by benchmark_series, duckdb_version
+  r.benchmark_series,
+  r.duckdb_version,
+  median(r.geomean_seconds) as baseline_seconds
+from benchmarks.geomean_runs r
+where r.storage_type = 'ducklake'
+  and r.duckdb_version in ('v1.4.5', 'v1.5.5')
+  -- the geomean query already carries the benchmark, scale-factor, machine and CPU filters, so
+  -- matching a row of it applies them here too
+  and exists (
+    select 1
+    from ${geomean} g
+    where g.benchmark_series = r.benchmark_series
+      and g.machine_label    = r.machine_label
+      and g.cpu_arch_label   = r.cpu_arch_label
+      and g.os               is not distinct from r.os
+      and g.queries_sha      = r.queries_sha
+  )
+group by r.benchmark_series, r.duckdb_version
+order by r.benchmark_series, r.duckdb_version
 ```
 
 ```sql chart_bounds
@@ -175,26 +235,43 @@ order by benchmark_series
 One chart per benchmark and scale factor. The benchmarks span orders of magnitude, so they do not
 share an axis.
 
-Each dot is one run. They are deliberately not connected: consecutive runs are different commits,
+Each dot is one run, placed at the date its commit was merged; runs of the same commit stack on the
+same date. They are deliberately not connected: consecutive runs are different commits,
 not a continuous measurement, so a line between them would imply a trend that the data does not
 support.
 
 Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
-`v2.0.0-alpha` series can be read against them. A version with no run for a given benchmark simply
-has no line there.
+`v2.0.0-alpha` series can be read against them. Each line is the median of that release's runs on
+the same machine, OS and query set as the runs in the chart. A version with no such run simply has
+no line there.
 
 <!--
-  sort=false keeps the points in the order the geomean query returns them (by run_timestamp).
+  sort=false keeps the points in the order the geomean query returns them (by merge_commit_date).
   Evidence's default sort=true reorders the rows by the *y* value, descending, whenever the x
-  column is a string - and run_date is a varchar - which scrambles the dates along the category
+  column is a string - and merge_date is a varchar - which scrambles the dates along the category
   axis.
 -->
+<script>
+  // x-axis labels as 'Aug 17, 17:10'. Display only: merge_date itself stays the category, so
+  // commits merged on the same day keep separate x positions, and the tooltip keeps the full
+  // timestamp. The time is in the label so that two commits merged on the same day do not both
+  // read 'Aug 17'.
+  // Read from the string rather than through Date, which would shift it into the viewer's
+  // timezone - merge_date is UTC.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthDayTime = (v) => {
+    const m = /^\d{4}-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(String(v));
+    return m ? `${MONTHS[Number(m[1]) - 1]} ${Number(m[2])}, ${m[3]}` : v;
+  };
+</script>
+
 {#each series_shown as s}
   <LineChart
       data={geomean.filter(d => d.benchmark_series === s.benchmark_series)}
-      x=run_date
+      x=merge_date
       xType=category
       showAllXAxisLabels=false
+      echartsOptions={{ xAxis: { axisLabel: { formatter: monthDayTime } } }}
       y=geomean_seconds
       yMax={chart_bounds.find(b => b.benchmark_series === s.benchmark_series)?.y_max}
       title={s.benchmark_series}
@@ -204,19 +281,38 @@ has no line there.
       sort=false
   >
       <!--
-        Back to a single data-driven line now that every label uses the same position: the split
-        into one component per baseline existed only so the label ends could alternate.
+        One component per release, so each gets its own colour and label side. The two releases
+        land within a few pixels of each other on most charts, and with one shared belowEnd
+        position the later label covered the earlier one completely - Evidence does not move
+        overlapping reference labels apart.
+        v1.4.5 is labelled above its line and v1.5.5 below: v1.5.5 is the faster of the two on
+        every chart so far, so the labels move apart. Should that ever flip, they would move
+        towards each other again, and the colours are what still tells the lines apart.
+        Each colour is a [light, dark] pair so it stays readable under the theme switcher (label
+        contrast >= 5:1 on both backgrounds); orange and teal also stay distinct from each other
+        under red-green colour blindness.
         hideValue drops the ' (0.0929)' suffix the component appends by default - the value is
         readable off the y-axis, and the version is what identifies the line.
-        emptySet=pass so a release with no run for this benchmark draws nothing instead of warning
-        (v1.4.5 has no DuckLake runs).
+        emptySet=pass so a release with no matching run for this chart draws nothing instead of
+        warning.
       -->
       <ReferenceLine
-          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series)}
+          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.4.5')}
           y=baseline_seconds
           label=duckdb_version
           hideValue=true
           lineType=dashed
+          color={['#c2410c', '#fb923c']}
+          labelPosition=aboveEnd
+          emptySet=pass
+      />
+      <ReferenceLine
+          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.5.5')}
+          y=baseline_seconds
+          label=duckdb_version
+          hideValue=true
+          lineType=dashed
+          color={['#0f766e', '#2dd4bf']}
           labelPosition=belowEnd
           emptySet=pass
       />
@@ -231,7 +327,7 @@ run - `# failed` is what tells them apart.
 ```sql run_table
 select
   benchmark_series,
-  run_date,
+  merge_date,
   duckdb_version,
   commit,
   round(geomean_seconds, 4) as 'geomean (s)',
@@ -241,12 +337,12 @@ select
   cpu_arch_label,
   query_set
 from ${geomean}
-order by run_timestamp desc
+order by merge_commit_date desc, run_timestamp desc
 ```
 
 <DataTable data={run_table} rows=25 search=true>
     <Column id=benchmark_series />
-    <Column id=run_date />
+    <Column id=merge_date />
     <Column id=duckdb_version />
     <Column id=commit />
     <Column id='geomean (s)' />
@@ -278,9 +374,11 @@ from benchmarks.geomean_runs
 where storage_type = 'ducklake'
   and benchmark in ${inputs.benchmark_select.value}
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and machine_label in ${inputs.machine_select.value}
-  and cpu_arch_label in ${inputs.cpu_arch_select.value}
-  and run_timestamp between '${inputs.date_select.start}' and '${inputs.date_select.end}'
+  and machine_label = '${inputs.machine_select}'
+  and cpu_arch_label = '${inputs.cpu_arch_select}'
+  -- same date filter as the geomean query above - see there for the two-day end bound
+  and merge_commit_date >= '${inputs.date_select.start}'
+  and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
 order by run_timestamp desc
 ```
 
