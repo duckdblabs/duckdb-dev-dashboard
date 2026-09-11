@@ -66,6 +66,12 @@ select
     -- the harness records this as naive UTC. A string, not a timestamp, so it survives to the
     -- front-end at minute precision instead of being re-formatted back to a bare date.
     strftime(r."timestamp", '%Y-%m-%d %H:%M') as run_date,
+    -- when the benchmarked commit was merged; the pages' date filter, chart x-axis and runs table
+    -- use this rather than run_timestamp. NULL for every release run (binary_source 'release').
+    r.merge_commit_date,
+    -- a string for the same reason as run_date. Runs of the same commit share it, so they stack
+    -- on one x position in the charts.
+    strftime(r.merge_commit_date, '%Y-%m-%d %H:%M') as merge_date,
     r.benchmark,        -- the suite: tpch / tpcds / clickbench
     r.benchmark_name,   -- the config / storage backend: duckdb / ducklake / local / local-ducklake
     r.scale_factor,     -- NULL for clickbench - never filter this with IN
