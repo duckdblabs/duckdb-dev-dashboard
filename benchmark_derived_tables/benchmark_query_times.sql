@@ -46,6 +46,7 @@ select
     r.benchmark || coalesce(' @ sf' || printf('%g', r.scale_factor), '') as benchmark_series,
     coalesce(r.cpu_arch, 'unknown')      as cpu_arch_label,
     coalesce(r.machine_type, 'unspecified') as machine_label,
+    r.os,
     r.duckdb_version,
     r.duckdb_commit_sha,
     r.queries_sha,
