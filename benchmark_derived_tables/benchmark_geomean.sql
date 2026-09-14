@@ -85,6 +85,7 @@ select
     r.duckdb_commit_sha,
     r.binary_source,
     r.os,
+    r.os_version,       -- NULL for runs whose harness did not record it
     r.cpu_arch,
     -- detected rather than supplied, so it should always be set - but a NULL slipping into an IN
     -- filter would silently empty the dashboard, so the page filters on this label instead.

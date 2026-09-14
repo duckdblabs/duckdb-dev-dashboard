@@ -24,11 +24,22 @@ select scale_factor_label from benchmarks.scale_factor_list
 
 ```sql os_options
 -- only values this page has runs with a merge date for (the date filter drops the rest): the
--- filters are single-select, so an option without runs would empty the whole page
-select distinct os
+-- filters are single-select, so an option without runs would empty the whole page.
+--
+-- The filter is on os; os_version is only shown, in the button label, as every version of that OS
+-- - e.g. 'linux (ubuntu 24.04, unspecified)'. One button per OS rather than per version: buttons sharing
+-- the value 'linux' would highlight together and select the same runs. A NULL version is shown as
+-- 'unspecified' (like machine_label) and listed last, since it is a real group of runs.
+select
+  os,
+  os || ' (' || concat_ws(', ',
+    string_agg(distinct os_version, ', ' order by os_version),
+    case when count(*) filter (where os_version is null) > 0 then 'unspecified' end
+  ) || ')' as os_label
 from benchmarks.geomean_runs
 where storage_type = 'ducklake'
   and merge_commit_date is not null
+group by os
 order by os
 ```
 
@@ -136,6 +147,7 @@ where storage_type = 'ducklake'
     name=os_select
     data={os_options}
     value=os
+    label=os_label
     defaultValue="linux"
     title="Select OS"
     description="Timings from different operating systems are not comparable"
