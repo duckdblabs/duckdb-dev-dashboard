@@ -39,6 +39,15 @@ where storage_type = 'duckdb'
 order by cpu_arch_label
 ```
 
+```sql os_options
+-- scoped like machine_options, for the same reason
+select distinct os
+from benchmarks.geomean_runs
+where storage_type = 'duckdb'
+  and merge_commit_date is not null
+order by os
+```
+
 ```sql date_options
 -- starts the date picker at this page's first benchmarked commit, so 'All Time' does not reach
 -- back to 1970. Only the start is taken from here: the DateRange pins the end to today.
@@ -118,13 +127,22 @@ where storage_type = 'duckdb'
     title="Select CPU architecture"
     description="Timings from different CPU architectures are not comparable"
 />
+<br>
+<ButtonGroup
+    name=os_select
+    data={os_options}
+    value=os
+    defaultValue="linux"
+    title="Select OS"
+    description="Timings from different operating systems are not comparable"
+/>
 
 <!-- dataLoaded: without it the warning flashes while the query is still running -->
 {#if geomean.dataLoaded && geomean.length === 0}
 <Alert status="warning">
 No runs match these filters. Either none of the commits merged in the selected time window has
-been benchmarked yet, or the selected machine and CPU architecture do not go together: each
-machine has a single CPU architecture.
+been benchmarked yet, or the selected machine, CPU architecture and OS do not go together: each
+machine has a single CPU architecture, and not every machine was benchmarked on every OS.
 </Alert>
 {/if}
 
@@ -157,6 +175,7 @@ where storage_type = 'duckdb'
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
   and machine_label = '${inputs.machine_select}'
   and cpu_arch_label = '${inputs.cpu_arch_select}'
+  and os = '${inputs.os_select}'
   -- the date filter is on the commit's merge date, not on when it was benchmarked. Release runs
   -- have no merge date and are deliberately excluded; they remain as the baselines below.
   --
@@ -188,7 +207,7 @@ select
 from benchmarks.geomean_runs r
 where r.storage_type = 'duckdb'
   and r.duckdb_version in ('v1.4.5', 'v1.5.5')
-  -- the geomean query already carries the benchmark, scale-factor, machine and CPU filters, so
+  -- the geomean query already carries the benchmark, scale-factor, machine, CPU and OS filters, so
   -- matching a row of it applies them here too
   and exists (
     select 1
@@ -332,7 +351,7 @@ order by merge_commit_date desc, run_timestamp desc
 ## Per-query execution times
 
 The individual queries of a single run, each against the two release baselines on the selected
-machine type and CPU architecture. Every timing of the release baselines is a median over that query's warm runs.
+machine type, CPU architecture and OS. Every timing of the release baselines is a median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
 slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
@@ -352,6 +371,7 @@ where storage_type = 'duckdb'
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
   and machine_label = '${inputs.machine_select}'
   and cpu_arch_label = '${inputs.cpu_arch_select}'
+  and os = '${inputs.os_select}'
   -- same date filter as the geomean query above - see there for the two-day end bound
   and merge_commit_date >= '${inputs.date_select.start}'
   and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
@@ -392,6 +412,7 @@ baselines as (
     and duckdb_version in ('v1.4.5', 'v1.5.5')
     and machine_label  = '${inputs.machine_select}'
     and cpu_arch_label = '${inputs.cpu_arch_select}'
+    and os             = '${inputs.os_select}'
   group by benchmark_series, query, duckdb_version
 )
 select
