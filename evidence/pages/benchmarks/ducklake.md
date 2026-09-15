@@ -3,18 +3,6 @@ title: Benchmarks on DuckLake Storage
 sidebar_title: DuckLake Storage
 ---
 
-Geometric mean of query execution time on **DuckLake** storage, over time.
-
-Each point is one benchmark run: the mean of its warm runs per query, then the geometric mean
-across the benchmark's queries. Data comes from the benchmark results lake written by
-`scripts/engineering/benchmark` in `duckdb-internal`. Test runs (`is_test`) are excluded.
-
-Other storage backends are on their own pages, so a slower backend never rescales a chart it does
-not belong to.
-
-The date and platform controls below apply to the charts and their baseline lines, the runs table,
-and the per-query execution times.
-
 ```sql date_options
 -- starts the date picker at this page's first benchmarked commit, so 'All Time' does not reach
 -- back to 1970. Only the start is taken from here: the DateRange pins the end to today.
