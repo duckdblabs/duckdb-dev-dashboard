@@ -79,7 +79,29 @@ where storage_type = 'duckdb'
   and merge_commit_date is not null
 ```
 
-### Filters
+<ButtonGroup
+    name=machine_select
+    data={machine_options}
+    value=machine_label
+    defaultValue="c6id.4xlarge"
+    title="Instance"
+/>
+
+<ButtonGroup
+    name=cpu_arch_select
+    data={cpu_arch_options}
+    value=cpu_arch_label
+    defaultValue="x86_64"
+    title="CPU arch"
+/>
+
+<ButtonGroup
+    name=os_select
+    data={os_options}
+    value=os
+    defaultValue="linux"
+    title="OS"
+/>
 
 <DateRange
     name=date_select
@@ -87,18 +109,16 @@ where storage_type = 'duckdb'
     dates=merge_commit_date
     end={new Date()}
     defaultValue={'Last 90 Days'}
-    title="Select time window"
-    description="Select time window"
+    title="Date range"
 />
-<br>
+
 <Dropdown
     name=benchmark_select
     data={benchmark_options}
     value=benchmark
     selectAllByDefault=true
     multiple=true
-    title="Select benchmark"
-    description="Select benchmark suite"
+    title="Suite"
 />
 
 ```sql sf_applicable
@@ -116,7 +136,7 @@ where storage_type = 'duckdb'
   below still interpolates it, which would break the whole page instead of hiding one control.
 -->
 <div style="display: {(sf_applicable?.[0]?.n ?? 0) > 0 ? 'block' : 'none'}">
-<br>
+
 <Dropdown
     name=sf_select
     data={sf_options}
@@ -128,45 +148,6 @@ where storage_type = 'duckdb'
 />
 </div>
 <br>
-<!--
-  Single-select, so the charts never mix timings from different hardware. A ButtonGroup selects
-  nothing without a defaultValue - and every query would then match no runs.
--->
-<ButtonGroup
-    name=os_select
-    data={os_options}
-    value=os
-    label=os_label
-    defaultValue="linux"
-    title="Select OS"
-    description="Timings from different operating systems are not comparable"
-/>
-<br>
-<ButtonGroup
-    name=cpu_arch_select
-    data={cpu_arch_options}
-    value=cpu_arch_label
-    defaultValue="x86_64"
-    title="Select CPU architecture"
-    description="Timings from different CPU architectures are not comparable"
-/>
-<br>
-<!--
-  The machine type options follow the OS and CPU architecture above. The group is remounted
-  whenever machine_resolved changes, because a ButtonGroup only applies defaultValue when it mounts:
-  that keeps the highlighted button equal to the machine type the queries filter on.
--->
-{#key machine_resolved?.[0]?.machine_label}
-<ButtonGroup
-    name=machine_select
-    data={machine_options}
-    value=machine_label
-    defaultValue={machine_resolved?.[0]?.machine_label}
-    title="Select machine type"
-    description="Only machine types that have runs on the selected OS and CPU architecture"
-/>
-{/key}
-
 {#if machine_options.dataLoaded && machine_options.length === 0}
 <Alert status="warning">
 No machine type has been benchmarked on the selected OS and CPU architecture.
