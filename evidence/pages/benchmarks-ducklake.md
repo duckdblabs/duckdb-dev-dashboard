@@ -22,18 +22,29 @@ select benchmark from benchmarks.benchmark_list
 select scale_factor_label from benchmarks.scale_factor_list
 ```
 
-```sql machine_options
--- only machines this page has runs with a merge date for (the date filter drops the rest): the
--- filter is single-select, so an option without runs would empty the whole page
-select distinct machine_label
+```sql os_options
+-- only values this page has runs with a merge date for (the date filter drops the rest): the
+-- filters are single-select, so an option without runs would empty the whole page.
+--
+-- The filter is on os; os_version is only shown, in the button label, as every version of that OS
+-- - e.g. 'linux (ubuntu 24.04, unspecified)'. One button per OS rather than per version: buttons sharing
+-- the value 'linux' would highlight together and select the same runs. A NULL version is shown as
+-- 'unspecified' (like machine_label) and listed last, since it is a real group of runs.
+select
+  os,
+  os || ' (' || concat_ws(', ',
+    string_agg(distinct os_version, ', ' order by os_version),
+    case when count(*) filter (where os_version is null) > 0 then 'unspecified' end
+  ) || ')' as os_label
 from benchmarks.geomean_runs
 where storage_type = 'ducklake'
   and merge_commit_date is not null
-order by machine_label
+group by os
+order by os
 ```
 
 ```sql cpu_arch_options
--- scoped like machine_options, for the same reason
+-- scoped like os_options, for the same reason
 select distinct cpu_arch_label
 from benchmarks.geomean_runs
 where storage_type = 'ducklake'
@@ -41,13 +52,33 @@ where storage_type = 'ducklake'
 order by cpu_arch_label
 ```
 
-```sql os_options
--- scoped like machine_options, for the same reason
-select distinct os
+```sql machine_options
+-- only the machine types that have runs on the selected OS and CPU architecture
+select distinct machine_label
 from benchmarks.geomean_runs
 where storage_type = 'ducklake'
   and merge_commit_date is not null
-order by os
+  and os             = '${inputs.os_select}'
+  and cpu_arch_label = '${inputs.cpu_arch_select}'
+order by machine_label
+```
+
+```sql machine_resolved
+-- The machine type the rest of the page filters on: the selected one while it is still among
+-- machine_options, otherwise unspecified, otherwise the first option.
+--
+-- Needed because a ButtonGroup keeps its selection when its options change, even once that button
+-- is gone: after switching to arm64 the input would still say c6id.4xlarge and empty the page.
+--
+-- `+ ''` turns a not-yet-selected input into '' instead of leaving it unset. Evidence does not run
+-- a query that references an unset input, and the machine ButtonGroup gets its initial selection
+-- from this query - without it, the two would wait on each other forever.
+select machine_label
+from ${machine_options}
+order by machine_label = '${inputs.machine_select + ''}' desc,
+         machine_label = 'unspecified' desc,
+         machine_label
+limit 1
 ```
 
 ```sql date_options
@@ -113,12 +144,13 @@ where storage_type = 'ducklake'
   nothing without a defaultValue - and every query would then match no runs.
 -->
 <ButtonGroup
-    name=machine_select
-    data={machine_options}
-    value=machine_label
-    defaultValue="unspecified"
-    title="Select machine type"
-    description="Timings from different machines are not comparable"
+    name=os_select
+    data={os_options}
+    value=os
+    label=os_label
+    defaultValue="linux"
+    title="Select OS"
+    description="Timings from different operating systems are not comparable"
 />
 <br>
 <ButtonGroup
@@ -130,21 +162,39 @@ where storage_type = 'ducklake'
     description="Timings from different CPU architectures are not comparable"
 />
 <br>
+<!--
+  The machine type options follow the OS and CPU architecture above. The group is remounted
+  whenever machine_resolved changes, because a ButtonGroup only applies defaultValue when it mounts:
+  that keeps the highlighted button equal to the machine type the queries filter on.
+-->
+{#key machine_resolved?.[0]?.machine_label}
 <ButtonGroup
-    name=os_select
-    data={os_options}
-    value=os
-    defaultValue="linux"
-    title="Select OS"
-    description="Timings from different operating systems are not comparable"
+    name=machine_select
+    data={machine_options}
+    value=machine_label
+    defaultValue={machine_resolved?.[0]?.machine_label}
+    title="Select machine type"
+    description="Only machine types that have runs on the selected OS and CPU architecture"
 />
+{/key}
 
-<!-- dataLoaded: without it the warning flashes while the query is still running -->
-{#if geomean.dataLoaded && geomean.length === 0}
+{#if machine_options.dataLoaded && machine_options.length === 0}
 <Alert status="warning">
-No runs match these filters. Either none of the commits merged in the selected time window has
-been benchmarked yet, or the selected machine, CPU architecture and OS do not go together: each
-machine has a single CPU architecture, and not every machine was benchmarked on every OS.
+No machine type has been benchmarked on the selected OS and CPU architecture.
+</Alert>
+{/if}
+
+<!--
+  dataLoaded: without it the warning flashes while the query is still running.
+  machine_options.length: when no machine type applies, the warning above already explains the
+  empty page, so this one only covers what machine_options does not look at - the time window and
+  the benchmark / scale-factor selection.
+-->
+{#if geomean.dataLoaded && geomean.length === 0 && machine_options.length > 0}
+<Alert status="warning">
+No runs match these filters: none of the commits merged in the selected time window has been
+benchmarked with the selected benchmarks and scale factors on this OS, CPU architecture and machine
+type yet.
 </Alert>
 {/if}
 
@@ -175,9 +225,9 @@ where storage_type = 'ducklake'
   -- the scale-factor filter only bites on benchmarks that have one; clickbench (scale_factor
   -- NULL) is exempt, so narrowing to sf100 does not make it disappear
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and machine_label = '${inputs.machine_select}'
+  and os             = '${inputs.os_select}'
   and cpu_arch_label = '${inputs.cpu_arch_select}'
-  and os = '${inputs.os_select}'
+  and machine_label  = (select machine_label from ${machine_resolved})
   -- the date filter is on the commit's merge date, not on when it was benchmarked. Release runs
   -- have no merge date and are deliberately excluded; they remain as the baselines below.
   --
@@ -374,9 +424,9 @@ from benchmarks.geomean_runs
 where storage_type = 'ducklake'
   and benchmark in ${inputs.benchmark_select.value}
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and machine_label = '${inputs.machine_select}'
+  and os             = '${inputs.os_select}'
   and cpu_arch_label = '${inputs.cpu_arch_select}'
-  and os = '${inputs.os_select}'
+  and machine_label  = (select machine_label from ${machine_resolved})
   -- same date filter as the geomean query above - see there for the two-day end bound
   and merge_commit_date >= '${inputs.date_select.start}'
   and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
@@ -415,9 +465,9 @@ baselines as (
   from benchmarks.query_times
   where storage_type = 'ducklake'
     and duckdb_version in ('v1.4.5', 'v1.5.5')
-    and machine_label  = '${inputs.machine_select}'
-    and cpu_arch_label = '${inputs.cpu_arch_select}'
     and os             = '${inputs.os_select}'
+    and cpu_arch_label = '${inputs.cpu_arch_select}'
+    and machine_label  = (select machine_label from ${machine_resolved})
   group by benchmark_series, query, duckdb_version
 )
 select
