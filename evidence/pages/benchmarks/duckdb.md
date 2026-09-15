@@ -1,15 +1,14 @@
 ---
-title: Benchmarks - DuckLake storage
+title: Benchmarks on DuckDB Storage
+sidebar_title: DuckDB Storage
 ---
 
-Geometric mean of query execution time on **DuckLake** storage, over time.
+Geometric mean of query execution time on **DuckDB** storage, over time.
+Each storage backend is on its own page.
 
 Each point is one benchmark run: the mean of its warm runs per query, then the geometric mean
 across the benchmark's queries. Data comes from the benchmark results lake written by
 `scripts/engineering/benchmark` in `duckdb-internal`. Test runs (`is_test`) are excluded.
-
-Other storage backends are on their own pages, so a slower backend never rescales a chart it does
-not belong to.
 
 The filters in the **Filters** section below control everything on this page: the charts and
 their baseline lines, the runs table, and the per-query execution times.
@@ -37,7 +36,7 @@ select
     case when count(*) filter (where os_version is null) > 0 then 'unspecified' end
   ) || ')' as os_label
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and merge_commit_date is not null
 group by os
 order by os
@@ -47,7 +46,7 @@ order by os
 -- scoped like os_options, for the same reason
 select distinct cpu_arch_label
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and merge_commit_date is not null
 order by cpu_arch_label
 ```
@@ -56,7 +55,7 @@ order by cpu_arch_label
 -- only the machine types that have runs on the selected OS and CPU architecture
 select distinct machine_label
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and merge_commit_date is not null
   and os             = '${inputs.os_select}'
   and cpu_arch_label = '${inputs.cpu_arch_select}'
@@ -65,7 +64,7 @@ order by machine_label
 
 ```sql machine_resolved
 -- The machine type the rest of the page filters on: the selected one while it is still among
--- machine_options, otherwise unspecified, otherwise the first option.
+-- machine_options, otherwise c6id.4xlarge, otherwise the first option.
 --
 -- Needed because a ButtonGroup keeps its selection when its options change, even once that button
 -- is gone: after switching to arm64 the input would still say c6id.4xlarge and empty the page.
@@ -76,7 +75,7 @@ order by machine_label
 select machine_label
 from ${machine_options}
 order by machine_label = '${inputs.machine_select + ''}' desc,
-         machine_label = 'unspecified' desc,
+         machine_label = 'c6id.4xlarge' desc,
          machine_label
 limit 1
 ```
@@ -86,7 +85,7 @@ limit 1
 -- back to 1970. Only the start is taken from here: the DateRange pins the end to today.
 select merge_commit_date::date as merge_commit_date
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and merge_commit_date is not null
 ```
 
@@ -115,7 +114,7 @@ where storage_type = 'ducklake'
 ```sql sf_applicable
 select count(*) as n
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and benchmark in ${inputs.benchmark_select.value}
   and scale_factor is not null
 ```
@@ -220,7 +219,7 @@ select
   os,
   queries_sha
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and benchmark in ${inputs.benchmark_select.value}
   -- the scale-factor filter only bites on benchmarks that have one; clickbench (scale_factor
   -- NULL) is exempt, so narrowing to sf100 does not make it disappear
@@ -257,7 +256,7 @@ select
   -- the latest matching run of that version
   arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
 from benchmarks.geomean_runs r
-where r.storage_type = 'ducklake'
+where r.storage_type = 'duckdb'
   and r.duckdb_version in ('v1.4.5', 'v1.5.5')
   -- the geomean query already carries the benchmark, scale-factor, machine, CPU and OS filters, so
   -- matching a row of it applies them here too
@@ -298,18 +297,15 @@ order by benchmark_series
 
 ## Geometric mean per benchmark
 
-One chart per benchmark and scale factor. The benchmarks span orders of magnitude, so they do not
-share an axis.
+One chart per benchmark and scale factor.
 
-Each dot is one run, placed at the date its commit was merged; runs of the same commit stack on the
-same date. They are deliberately not connected: consecutive runs are different commits,
-not a continuous measurement, so a line between them would imply a trend that the data does not
-support.
+Each dot is one run, placed at the date its commit was merged. Runs of the same commit stack on the
+same date.
 
 Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
 `v2.0.0-alpha` series can be read against them. Each line is that release's latest run on the same
-machine, OS and query set as the runs in the chart. A version with no such run simply has
-no line there.
+machine, OS and query set as the runs in the chart. A version with no such run simply has no line
+there.
 
 <!--
   sort=false keeps the points in the order the geomean query returns them (by merge_commit_date).
@@ -421,7 +417,7 @@ select
   run_date || '  -  ' || benchmark_series || '  -  ' || duckdb_version as run_label,
   run_timestamp
 from benchmarks.geomean_runs
-where storage_type = 'ducklake'
+where storage_type = 'duckdb'
   and benchmark in ${inputs.benchmark_select.value}
   and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
   and os             = '${inputs.os_select}'
@@ -451,7 +447,7 @@ order by run_timestamp desc
 with selected as (
   select *
   from benchmarks.query_times
-  where storage_type = 'ducklake'
+  where storage_type = 'duckdb'
     and run_id = coalesce(
           (select run_id from ${run_options} where run_id = '${inputs.run_select.value}'),
           (select run_id from ${run_options} order by run_timestamp desc limit 1))
@@ -463,7 +459,7 @@ baselines as (
     duckdb_version,
     median(median_seconds) as baseline_seconds
   from benchmarks.query_times
-  where storage_type = 'ducklake'
+  where storage_type = 'duckdb'
     and duckdb_version in ('v1.4.5', 'v1.5.5')
     and os             = '${inputs.os_select}'
     and cpu_arch_label = '${inputs.cpu_arch_select}'
