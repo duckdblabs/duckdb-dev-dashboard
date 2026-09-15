@@ -3,16 +3,6 @@ title: Benchmarks on DuckDB Storage
 sidebar_title: DuckDB Storage
 ---
 
-Geometric mean of query execution time on **DuckDB** storage, over time.
-Each storage backend is on its own page.
-
-Each point is one benchmark run: the mean of its warm runs per query, then the geometric mean
-across the benchmark's queries. Data comes from the benchmark results lake written by
-`scripts/engineering/benchmark` in `duckdb-internal`. Test runs (`is_test`) are excluded.
-
-The filters in the **Filters** section below control everything on this page: the charts and
-their baseline lines, the runs table, and the per-query execution times.
-
 ```sql benchmark_options
 select benchmark from benchmarks.benchmark_list
 ```
