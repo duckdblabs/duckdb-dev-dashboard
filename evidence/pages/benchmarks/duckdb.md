@@ -188,81 +188,196 @@ from (
 group by benchmark_series
 ```
 
-```sql series_shown
-select distinct benchmark_series
-from ${geomean}
-order by benchmark_series
-```
-
-## Geometric mean per benchmark
-
-One chart per benchmark and scale factor.
-
-Each dot is one run, placed at the date its commit was merged. Runs of the same commit stack on the
-same date.
-
-Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
-`v2.0.0-alpha` series can be read against them. Each line is that release's latest run on the same
-machine, OS and query set as the runs in the chart. A version with no such run simply has no line
-there.
-
-<!--
-  sort=false keeps the points in the order the geomean query returns them (by merge_commit_date).
-  Evidence's default sort=true reorders the rows by the *y* value, descending, whenever the x
-  column is a string - and merge_date is a varchar - which scrambles the dates along the category
-  axis.
--->
 <script>
-  // x-axis labels as 'Aug 17, 17:10'. Display only: merge_date itself stays the category, so
-  // commits merged on the same day keep separate x positions, and the tooltip keeps the full
-  // timestamp. The time is in the label so that two commits merged on the same day do not both
-  // read 'Aug 17'.
-  // Read from the string rather than through Date, which would shift it into the viewer's
-  // timezone - merge_date is UTC.
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthDayTime = (v) => {
-    const m = /^\d{4}-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(String(v));
-    return m ? `${MONTHS[Number(m[1]) - 1]} ${Number(m[2])}, ${m[3]}` : v;
+
+  // Evidence normalizes timestamp strings without a timezone before passing them to ECharts.
+  // Local getters preserve those UTC wall-clock values instead of applying the browser timezone.
+  const chartDate = (value) => {
+    if (value instanceof Date) return value;
+    if (typeof value === 'number') return new Date(value);
+    return new Date(String(value).replace(' ', 'T').replace(/Z$/, ''));
+  };
+
+  const chartTime = (value) => chartDate(value).getTime();
+  const twoDigits = (value) => String(value).padStart(2, '0');
+
+  const shortDate = (value) => {
+    const date = chartDate(value);
+    return Number.isNaN(date.getTime()) ? String(value) : `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+  };
+
+  const fullTimestamp = (value) => {
+    const date = chartDate(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}:${twoDigits(date.getSeconds())} UTC`;
+  };
+
+  const isCommitSha = (value) => /^[0-9a-f]{7,40}$/i.test(value ?? '');
+
+  const benchmarkChartOptions = (rows) => {
+    // A commit can have multiple benchmark runs. De-duplicate it before assigning predecessors so
+    // repeated runs compare against the previous benchmarked commit, not against each other.
+    const commits = [...new Set(
+      rows
+        .filter((row) => isCommitSha(row.commit_sha))
+        .sort((a, b) => chartTime(a.merge_commit_date) - chartTime(b.merge_commit_date)
+          || a.commit_sha.localeCompare(b.commit_sha))
+        .map((row) => row.commit_sha)
+    )];
+    const previousCommitBySha = new Map(
+      commits.slice(1).map((commitSha, index) => [commitSha, commits[index]])
+    );
+
+    return {
+      xAxis: {
+        // splitNumber is a target rather than a hard count. The one-day minimum prevents a 30- or
+        // 90-day view from filling the axis with timestamp-level ticks.
+        splitNumber: 6,
+        minInterval: 24 * 60 * 60 * 1000,
+        axisLabel: { formatter: shortDate }
+      },
+      tooltip: {
+        trigger: 'item',
+        renderMode: 'html',
+        enterable: true,
+        hideDelay: 300,
+        confine: true,
+        formatter: (params) => {
+          const point = Array.isArray(params) ? params[0] : params;
+          if (!Array.isArray(point?.value)) return '';
+
+          const [timestamp, geomean] = point.value;
+          const row = rows.find((candidate) =>
+            chartTime(candidate.merge_commit_date) === chartTime(timestamp)
+            && Number(candidate.geomean_seconds) === Number(geomean)
+          );
+          const commitSha = row?.commit_sha ?? '';
+          const commitLabel = row?.commit ?? commitSha.slice(0, 8);
+          const previousCommitSha = previousCommitBySha.get(commitSha);
+          const commitLink = isCommitSha(commitSha)
+            ? `<a href="https://github.com/duckdb/duckdb/commit/${commitSha}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${commitLabel}</a>`
+            : 'Unknown';
+          const comparisonLinks = previousCommitSha
+            ? ` (<a href="https://github.com/duckdb/duckdb/compare/${previousCommitSha}..${commitSha}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">range</a>, <a href="https://github.com/duckdb/duckdb/compare/${previousCommitSha}...${commitSha}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">PRs</a>)`
+            : '';
+          const seconds = Number.isFinite(Number(geomean)) ? Number(geomean).toFixed(3) : 'Unknown';
+          const mergedAt = fullTimestamp(row?.merge_commit_date ?? timestamp);
+
+          return `<strong>Merged ${mergedAt}</strong><br>geomean (sec): ${seconds}<br>commit: ${commitLink}${comparisonLinks}`;
+        }
+      }
+    };
   };
 </script>
 
-{#each series_shown as s}
-  <LineChart
-      data={geomean.filter(d => d.benchmark_series === s.benchmark_series)}
-      x=merge_date
-      xType=category
-      showAllXAxisLabels=false
-      echartsOptions={{ xAxis: { axisLabel: { formatter: monthDayTime } } }}
-      y=geomean_seconds
-      yMax={chart_bounds.find(b => b.benchmark_series === s.benchmark_series)?.y_max}
-      title={s.benchmark_series}
-      yAxisTitle="geomean (seconds)"
-      markers=true
-      lineWidth=0
-      sort=false
-  >
-      <ReferenceLine
-          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.4.5')}
-          y=baseline_seconds
-          label=duckdb_version
-          hideValue=true
-          lineType=dashed
-          color={['#c2410c', '#fb923c']}
-          labelPosition=aboveEnd
-          emptySet=pass
-      />
-      <ReferenceLine
-          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.5.5')}
-          y=baseline_seconds
-          label=duckdb_version
-          hideValue=true
-          lineType=dashed
-          color={['#0f766e', '#2dd4bf']}
-          labelPosition=belowEnd
-          emptySet=pass
-      />
-  </LineChart>
-{/each}
+## TPC-DS @ sf100
+
+<LineChart
+    data={geomean.filter(d => d.benchmark_series === 'tpcds @ sf100')}
+    x=merge_commit_date
+    xType=time
+    echartsOptions={benchmarkChartOptions(geomean.filter(d => d.benchmark_series === 'tpcds @ sf100'))}
+    y=geomean_seconds
+    yFmt=num3
+    yMax={chart_bounds.find(b => b.benchmark_series === 'tpcds @ sf100')?.y_max}
+    yAxisTitle="geomean (sec)"
+    markers=true
+    lineWidth=0
+>
+    <ReferenceLine
+        data={version_baselines.filter(d => d.benchmark_series === 'tpcds @ sf100' && d.duckdb_version === 'v1.4.5')}
+        y=baseline_seconds
+        label=duckdb_version
+        hideValue=true
+        lineType=dashed
+        color={['#c2410c', '#fb923c']}
+        labelPosition=aboveEnd
+        emptySet=pass
+    />
+    <ReferenceLine
+        data={version_baselines.filter(d => d.benchmark_series === 'tpcds @ sf100' && d.duckdb_version === 'v1.5.5')}
+        y=baseline_seconds
+        label=duckdb_version
+        hideValue=true
+        lineType=dashed
+        color={['#0f766e', '#2dd4bf']}
+        labelPosition=belowEnd
+        emptySet=pass
+    />
+</LineChart>
+
+## TPC-H @ sf100
+
+<LineChart
+    data={geomean.filter(d => d.benchmark_series === 'tpch @ sf100')}
+    x=merge_commit_date
+    xType=time
+    echartsOptions={benchmarkChartOptions(geomean.filter(d => d.benchmark_series === 'tpch @ sf100'))}
+    y=geomean_seconds
+    yFmt=num3
+    yMax={chart_bounds.find(b => b.benchmark_series === 'tpch @ sf100')?.y_max}
+    yAxisTitle="geomean (sec)"
+    markers=true
+    lineWidth=0
+>
+    <ReferenceLine
+        data={version_baselines.filter(d => d.benchmark_series === 'tpch @ sf100' && d.duckdb_version === 'v1.4.5')}
+        y=baseline_seconds
+        label=duckdb_version
+        hideValue=true
+        lineType=dashed
+        color={['#c2410c', '#fb923c']}
+        labelPosition=aboveEnd
+        emptySet=pass
+    />
+    <ReferenceLine
+        data={version_baselines.filter(d => d.benchmark_series === 'tpch @ sf100' && d.duckdb_version === 'v1.5.5')}
+        y=baseline_seconds
+        label=duckdb_version
+        hideValue=true
+        lineType=dashed
+        color={['#0f766e', '#2dd4bf']}
+        labelPosition=belowEnd
+        emptySet=pass
+    />
+</LineChart>
+
+## ClickBench
+
+<LineChart
+    data={geomean.filter(d => d.benchmark_series === 'clickbench')}
+    x=merge_commit_date
+    xType=time
+    echartsOptions={benchmarkChartOptions(geomean.filter(d => d.benchmark_series === 'clickbench'))}
+    y=geomean_seconds
+    yFmt=num3
+    yMax={chart_bounds.find(b => b.benchmark_series === 'clickbench')?.y_max}
+    yAxisTitle="geomean (sec)"
+    markers=true
+    lineWidth=0
+>
+    <ReferenceLine
+        data={version_baselines.filter(d => d.benchmark_series === 'clickbench' && d.duckdb_version === 'v1.4.5')}
+        y=baseline_seconds
+        label=duckdb_version
+        hideValue=true
+        lineType=dashed
+        color={['#c2410c', '#fb923c']}
+        labelPosition=aboveEnd
+        emptySet=pass
+    />
+    <ReferenceLine
+        data={version_baselines.filter(d => d.benchmark_series === 'clickbench' && d.duckdb_version === 'v1.5.5')}
+        y=baseline_seconds
+        label=duckdb_version
+        hideValue=true
+        lineType=dashed
+        color={['#0f766e', '#2dd4bf']}
+        labelPosition=belowEnd
+        emptySet=pass
+    />
+</LineChart>
 
 ## Runs
 
