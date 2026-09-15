@@ -3,73 +3,6 @@ title: Benchmarks on DuckDB Storage
 sidebar_title: DuckDB Storage
 ---
 
-```sql benchmark_options
-select benchmark from benchmarks.benchmark_list
-```
-
-```sql sf_options
-select scale_factor_label from benchmarks.scale_factor_list
-```
-
-```sql os_options
--- only values this page has runs with a merge date for (the date filter drops the rest): the
--- filters are single-select, so an option without runs would empty the whole page.
---
--- The filter is on os; os_version is only shown, in the button label, as every version of that OS
--- - e.g. 'linux (ubuntu 24.04, unspecified)'. One button per OS rather than per version: buttons sharing
--- the value 'linux' would highlight together and select the same runs. A NULL version is shown as
--- 'unspecified' (like machine_label) and listed last, since it is a real group of runs.
-select
-  os,
-  os || ' (' || concat_ws(', ',
-    string_agg(distinct os_version, ', ' order by os_version),
-    case when count(*) filter (where os_version is null) > 0 then 'unspecified' end
-  ) || ')' as os_label
-from benchmarks.geomean_runs
-where storage_type = 'duckdb'
-  and merge_commit_date is not null
-group by os
-order by os
-```
-
-```sql cpu_arch_options
--- scoped like os_options, for the same reason
-select distinct cpu_arch_label
-from benchmarks.geomean_runs
-where storage_type = 'duckdb'
-  and merge_commit_date is not null
-order by cpu_arch_label
-```
-
-```sql machine_options
--- only the machine types that have runs on the selected OS and CPU architecture
-select distinct machine_label
-from benchmarks.geomean_runs
-where storage_type = 'duckdb'
-  and merge_commit_date is not null
-  and os             = '${inputs.os_select}'
-  and cpu_arch_label = '${inputs.cpu_arch_select}'
-order by machine_label
-```
-
-```sql machine_resolved
--- The machine type the rest of the page filters on: the selected one while it is still among
--- machine_options, otherwise c6id.4xlarge, otherwise the first option.
---
--- Needed because a ButtonGroup keeps its selection when its options change, even once that button
--- is gone: after switching to arm64 the input would still say c6id.4xlarge and empty the page.
---
--- `+ ''` turns a not-yet-selected input into '' instead of leaving it unset. Evidence does not run
--- a query that references an unset input, and the machine ButtonGroup gets its initial selection
--- from this query - without it, the two would wait on each other forever.
-select machine_label
-from ${machine_options}
-order by machine_label = '${inputs.machine_select + ''}' desc,
-         machine_label = 'c6id.4xlarge' desc,
-         machine_label
-limit 1
-```
-
 ```sql date_options
 -- starts the date picker at this page's first benchmarked commit, so 'All Time' does not reach
 -- back to 1970. Only the start is taken from here: the DateRange pins the end to today.
@@ -79,125 +12,120 @@ where storage_type = 'duckdb'
   and merge_commit_date is not null
 ```
 
-<ButtonGroup
-    name=machine_select
-    data={machine_options}
-    value=machine_label
-    defaultValue="c6id.4xlarge"
-    title="Instance"
-/>
-
-<ButtonGroup
-    name=cpu_arch_select
-    data={cpu_arch_options}
-    value=cpu_arch_label
-    defaultValue="x86_64"
-    title="CPU arch"
-/>
-
-<ButtonGroup
-    name=os_select
-    data={os_options}
-    value=os
-    defaultValue="linux"
-    title="OS"
-/>
-
 <DateRange
     name=date_select
     data={date_options}
     dates=merge_commit_date
     end={new Date()}
     defaultValue={'Last 90 Days'}
-    title="Date range"
 />
 
-<Dropdown
-    name=benchmark_select
-    data={benchmark_options}
-    value=benchmark
-    selectAllByDefault=true
-    multiple=true
-    title="Suite"
-/>
+<br>
 
-```sql sf_applicable
-select count(*) as n
+```sql platform_options
+-- A platform is the combination of OS, CPU architecture and machine type: timings from different
+-- combinations are not comparable. The hardware details are curated because the benchmark lake
+-- does not record vCPU count, RAM or OS version. Unknown combinations retain a generic label
+-- rather than disappearing from the dashboard.
+select distinct
+  concat_ws('|', coalesce(os, 'unknown'), cpu_arch_label, machine_label) as platform_id,
+  os,
+  cpu_arch_label,
+  machine_label,
+  case
+    when os = 'linux' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
+      then 'Ubuntu 24.04 (amd64, 16 vCPU)'
+    when os = 'linux' and cpu_arch_label = 'arm64' and machine_label = 'c7gd.4xlarge'
+      then 'Ubuntu 24.04 (arm64, 16 vCPU)'
+    when os = 'macos' and cpu_arch_label = 'arm64' and machine_label = 'mac-m4.metal'
+      then 'macOS m4 (arm64, 10 vCPU)'
+    when os = 'windows' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
+      then 'Windows Server 2025 (amd64, 16 vCPU)'
+    else
+      (case coalesce(os, 'unknown')
+        when 'linux' then 'Linux'
+        when 'macos' then 'macOS'
+        when 'windows' then 'Windows'
+        else coalesce(os, 'Unknown OS')
+      end)
+      || ' ('
+      || (case cpu_arch_label when 'x86_64' then 'amd64' else cpu_arch_label end)
+      || ', '
+      || (case machine_label when 'unspecified' then 'instance unspecified' else machine_label end)
+      || ')'
+  end as platform_label,
+  case
+    when os = 'linux' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
+      then '32 GiB'
+    when os = 'linux' and cpu_arch_label = 'arm64' and machine_label = 'c7gd.4xlarge'
+      then '32 GiB'
+    when os = 'macos' and cpu_arch_label = 'arm64' and machine_label = 'mac-m4.metal'
+      then '24 GiB'
+    when os = 'windows' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
+      then '32 GiB'
+    else 'Unknown'
+  end as memory_label
 from benchmarks.geomean_runs
 where storage_type = 'duckdb'
-  and benchmark in ${inputs.benchmark_select.value}
-  and scale_factor is not null
+  and merge_commit_date is not null
+order by platform_label collate nocase, platform_label
 ```
 
-<!--
-  The scale-factor filter is hidden when the benchmark selection contains nothing that has a
-  scale factor - i.e. clickbench only. Hidden with CSS rather than removed with an if-block on
-  purpose: unmounting the Dropdown drops sf_select from the inputs store, while the geomean query
-  below still interpolates it, which would break the whole page instead of hiding one control.
--->
-<div style="display: {(sf_applicable?.[0]?.n ?? 0) > 0 ? 'block' : 'none'}">
+```sql selected_platform
+select memory_label
+from ${platform_options}
+where platform_id = '${inputs.platform_select.value}'
+```
 
 <Dropdown
-    name=sf_select
-    data={sf_options}
-    value=scale_factor_label
-    selectAllByDefault=true
-    multiple=true
-    title="Select scale factor (tpch / tpcds)"
-    description="Only applies to benchmarks that have a scale factor; clickbench is always shown"
+    name=platform_select
+    data={platform_options}
+    value=platform_id
+    label=platform_label
+    defaultValue="linux|x86_64|c6id.4xlarge"
+    title="Platform"
+    description="OS, CPU architecture and machine type"
 />
-</div>
-<br>
-{#if machine_options.dataLoaded && machine_options.length === 0}
-<Alert status="warning">
-No machine type has been benchmarked on the selected OS and CPU architecture.
-</Alert>
-{/if}
+<span class="mt-4 text-xs font-medium">Memory: {selected_platform?.[0]?.memory_label ?? 'Unknown'}</span>
 
-<!--
-  dataLoaded: without it the warning flashes while the query is still running.
-  machine_options.length: when no machine type applies, the warning above already explains the
-  empty page, so this one only covers what machine_options does not look at - the time window and
-  the benchmark / scale-factor selection.
--->
-{#if geomean.dataLoaded && geomean.length === 0 && machine_options.length > 0}
+
+<!-- dataLoaded: without it the warning flashes while the query is still running -->
+{#if geomean.dataLoaded && geomean.length === 0}
 <Alert status="warning">
-No runs match these filters: none of the commits merged in the selected time window has been
-benchmarked with the selected benchmarks and scale factors on this OS, CPU architecture and machine
-type yet.
+No runs match this platform and date range.
 </Alert>
 {/if}
 
 ```sql geomean
 select
-  benchmark_series,
-  benchmark,
-  scale_factor_label,
-  run_timestamp,
-  merge_commit_date,
-  merge_date,
-  geomean_seconds,
-  duckdb_version,
-  duckdb_commit_sha[:8] as commit,
-  machine_label,
-  cpu_arch_label,
-  queries_ok,
-  queries_attempted,
-  queries_failed,
-  is_complete,
-  queries_sha[:8] as query_set,
+  r.benchmark_series,
+  r.benchmark,
+  r.scale_factor_label,
+  r.run_timestamp,
+  r.merge_commit_date,
+  r.merge_date,
+  r.geomean_seconds,
+  r.duckdb_version,
+  r.duckdb_commit_sha as commit_sha,
+  r.duckdb_commit_sha[:8] as commit,
+  p.platform_label as platform,
+  r.machine_label,
+  r.cpu_arch_label,
+  r.queries_ok,
+  r.queries_attempted,
+  r.queries_failed,
+  r.is_complete,
+  r.queries_sha[:8] as query_set,
   -- not displayed: version_baselines matches release runs to the plotted runs on these
-  os,
-  queries_sha
-from benchmarks.geomean_runs
-where storage_type = 'duckdb'
-  and benchmark in ${inputs.benchmark_select.value}
-  -- the scale-factor filter only bites on benchmarks that have one; clickbench (scale_factor
-  -- NULL) is exempt, so narrowing to sf100 does not make it disappear
-  and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and os             = '${inputs.os_select}'
-  and cpu_arch_label = '${inputs.cpu_arch_select}'
-  and machine_label  = (select machine_label from ${machine_resolved})
+  r.os,
+  r.queries_sha
+from benchmarks.geomean_runs r
+join ${platform_options} p
+  on p.platform_id = '${inputs.platform_select.value}'
+ and p.machine_label = r.machine_label
+ and p.cpu_arch_label = r.cpu_arch_label
+ and p.os is not distinct from r.os
+where r.storage_type = 'duckdb'
   -- the date filter is on the commit's merge date, not on when it was benchmarked. Release runs
   -- have no merge date and are deliberately excluded; they remain as the baselines below.
   --
@@ -206,9 +134,9 @@ where storage_type = 'duckdb'
   -- '2026-09-02'. One day compensates for that, the other makes the end day inclusive. The window
   -- can come out a day wider than the picker shows, but never narrower; narrower would drop the
   -- commits merged on the window's last day.
-  and merge_commit_date >= '${inputs.date_select.start}'
-  and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
-order by merge_commit_date, run_timestamp
+  and r.merge_commit_date >= '${inputs.date_select.start}'
+  and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+order by r.merge_commit_date, r.run_timestamp
 ```
 
 ```sql version_baselines
@@ -220,7 +148,7 @@ order by merge_commit_date, run_timestamp
 --
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
 -- narrowing the window should not make it vanish. The releases were measured well before most of
--- the alpha runs. The window only decides which OS and query sets are on the chart to match.
+-- the alpha runs. The window only decides which platform and query sets are on the chart to match.
 select
   r.benchmark_series,
   r.duckdb_version,
@@ -229,8 +157,8 @@ select
 from benchmarks.geomean_runs r
 where r.storage_type = 'duckdb'
   and r.duckdb_version in ('v1.4.5', 'v1.5.5')
-  -- the geomean query already carries the benchmark, scale-factor, machine, CPU and OS filters, so
-  -- matching a row of it applies them here too
+  -- the geomean query already carries the platform filter and identifies each benchmark series,
+  -- so matching a row of it applies both here too
   and exists (
     select 1
     from ${geomean} g
@@ -347,11 +275,10 @@ select
   merge_date,
   duckdb_version,
   commit,
-  round(geomean_seconds, 4) as 'geomean (s)',
+  round(geomean_seconds, 3) as 'geomean (sec)',
   queries_ok as '# ok',
   queries_failed as '# failed',
-  machine_label,
-  cpu_arch_label,
+  platform,
   query_set
 from ${geomean}
 order by merge_commit_date desc, run_timestamp desc
@@ -362,18 +289,17 @@ order by merge_commit_date desc, run_timestamp desc
     <Column id=merge_date />
     <Column id=duckdb_version />
     <Column id=commit />
-    <Column id='geomean (s)' />
+    <Column id='geomean (sec)' fmt=num3 />
     <Column id='# ok' />
     <Column id='# failed' />
-    <Column id=machine_label />
-    <Column id=cpu_arch_label />
+    <Column id=platform />
     <Column id=query_set />
 </DataTable>
 
 ## Per-query execution times
 
 The individual queries of a single run, each against the two release baselines on the selected
-machine type, CPU architecture and OS. Every timing of the release baselines is a median over that query's warm runs.
+platform. Every timing of the release baselines is a median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
 slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
@@ -384,20 +310,20 @@ listed with empty timings.
 
 ```sql run_options
 select
-  run_id,
-  run_date || '  -  ' || benchmark_series || '  -  ' || duckdb_version as run_label,
-  run_timestamp
-from benchmarks.geomean_runs
-where storage_type = 'duckdb'
-  and benchmark in ${inputs.benchmark_select.value}
-  and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and os             = '${inputs.os_select}'
-  and cpu_arch_label = '${inputs.cpu_arch_select}'
-  and machine_label  = (select machine_label from ${machine_resolved})
+  r.run_id,
+  r.run_date || '  -  ' || r.benchmark_series || '  -  ' || r.duckdb_version as run_label,
+  r.run_timestamp
+from benchmarks.geomean_runs r
+join ${platform_options} p
+  on p.platform_id = '${inputs.platform_select.value}'
+ and p.machine_label = r.machine_label
+ and p.cpu_arch_label = r.cpu_arch_label
+ and p.os is not distinct from r.os
+where r.storage_type = 'duckdb'
   -- same date filter as the geomean query above - see there for the two-day end bound
-  and merge_commit_date >= '${inputs.date_select.start}'
-  and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
-order by run_timestamp desc
+  and r.merge_commit_date >= '${inputs.date_select.start}'
+  and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+order by r.run_timestamp desc
 ```
 
 <Dropdown
@@ -429,13 +355,15 @@ baselines as (
     query,
     duckdb_version,
     median(median_seconds) as baseline_seconds
-  from benchmarks.query_times
-  where storage_type = 'duckdb'
-    and duckdb_version in ('v1.4.5', 'v1.5.5')
-    and os             = '${inputs.os_select}'
-    and cpu_arch_label = '${inputs.cpu_arch_select}'
-    and machine_label  = (select machine_label from ${machine_resolved})
-  group by benchmark_series, query, duckdb_version
+  from benchmarks.query_times q
+  join ${platform_options} p
+    on p.platform_id = '${inputs.platform_select.value}'
+   and p.machine_label = q.machine_label
+   and p.cpu_arch_label = q.cpu_arch_label
+   and p.os is not distinct from q.os
+  where q.storage_type = 'duckdb'
+    and q.duckdb_version in ('v1.4.5', 'v1.5.5')
+  group by q.benchmark_series, q.query, q.duckdb_version
 )
 select
   s.query,
