@@ -12,75 +12,8 @@ across the benchmark's queries. Data comes from the benchmark results lake writt
 Other storage backends are on their own pages, so a slower backend never rescales a chart it does
 not belong to.
 
-The filters in the **Filters** section below control everything on this page: the charts and
-their baseline lines, the runs table, and the per-query execution times.
-
-```sql benchmark_options
-select benchmark from benchmarks.benchmark_list
-```
-
-```sql sf_options
-select scale_factor_label from benchmarks.scale_factor_list
-```
-
-```sql os_options
--- only values this page has runs with a merge date for (the date filter drops the rest): the
--- filters are single-select, so an option without runs would empty the whole page.
---
--- The filter is on os; os_version is only shown, in the button label, as every version of that OS
--- - e.g. 'linux (ubuntu 24.04, unspecified)'. One button per OS rather than per version: buttons sharing
--- the value 'linux' would highlight together and select the same runs. A NULL version is shown as
--- 'unspecified' (like machine_label) and listed last, since it is a real group of runs.
-select
-  os,
-  os || ' (' || concat_ws(', ',
-    string_agg(distinct os_version, ', ' order by os_version),
-    case when count(*) filter (where os_version is null) > 0 then 'unspecified' end
-  ) || ')' as os_label
-from benchmarks.geomean_runs
-where storage_type = 'ducklake'
-  and merge_commit_date is not null
-group by os
-order by os
-```
-
-```sql cpu_arch_options
--- scoped like os_options, for the same reason
-select distinct cpu_arch_label
-from benchmarks.geomean_runs
-where storage_type = 'ducklake'
-  and merge_commit_date is not null
-order by cpu_arch_label
-```
-
-```sql machine_options
--- only the machine types that have runs on the selected OS and CPU architecture
-select distinct machine_label
-from benchmarks.geomean_runs
-where storage_type = 'ducklake'
-  and merge_commit_date is not null
-  and os             = '${inputs.os_select}'
-  and cpu_arch_label = '${inputs.cpu_arch_select}'
-order by machine_label
-```
-
-```sql machine_resolved
--- The machine type the rest of the page filters on: the selected one while it is still among
--- machine_options, otherwise unspecified, otherwise the first option.
---
--- Needed because a ButtonGroup keeps its selection when its options change, even once that button
--- is gone: after switching to arm64 the input would still say c6id.4xlarge and empty the page.
---
--- `+ ''` turns a not-yet-selected input into '' instead of leaving it unset. Evidence does not run
--- a query that references an unset input, and the machine ButtonGroup gets its initial selection
--- from this query - without it, the two would wait on each other forever.
-select machine_label
-from ${machine_options}
-order by machine_label = '${inputs.machine_select + ''}' desc,
-         machine_label = 'unspecified' desc,
-         machine_label
-limit 1
-```
+The date and platform controls below apply to the charts and their baseline lines, the runs table,
+and the per-query execution times.
 
 ```sql date_options
 -- starts the date picker at this page's first benchmarked commit, so 'All Time' does not reach
@@ -91,144 +24,79 @@ where storage_type = 'ducklake'
   and merge_commit_date is not null
 ```
 
-### Filters
-
 <DateRange
     name=date_select
     data={date_options}
     dates=merge_commit_date
     end={new Date()}
     defaultValue={'Last 90 Days'}
-    title="Select time window"
-    description="Select time window"
-/>
-<br>
-<Dropdown
-    name=benchmark_select
-    data={benchmark_options}
-    value=benchmark
-    selectAllByDefault=true
-    multiple=true
-    title="Select benchmark"
-    description="Select benchmark suite"
 />
 
-```sql sf_applicable
-select count(*) as n
-from benchmarks.geomean_runs
+<br>
+
+```sql platform_options
+select platform_id, os, cpu_arch_label, machine_label, platform_label, memory_label
+from benchmarks.platforms
 where storage_type = 'ducklake'
-  and benchmark in ${inputs.benchmark_select.value}
-  and scale_factor is not null
+order by platform_label collate nocase, platform_label
 ```
 
-<!--
-  The scale-factor filter is hidden when the benchmark selection contains nothing that has a
-  scale factor - i.e. clickbench only. Hidden with CSS rather than removed with an if-block on
-  purpose: unmounting the Dropdown drops sf_select from the inputs store, while the geomean query
-  below still interpolates it, which would break the whole page instead of hiding one control.
--->
-<div style="display: {(sf_applicable?.[0]?.n ?? 0) > 0 ? 'block' : 'none'}">
-<br>
+```sql selected_platform
+select memory_label
+from ${platform_options}
+where platform_id = '${inputs.platform_select.value}'
+```
+
 <Dropdown
-    name=sf_select
-    data={sf_options}
-    value=scale_factor_label
-    selectAllByDefault=true
-    multiple=true
-    title="Select scale factor (tpch / tpcds)"
-    description="Only applies to benchmarks that have a scale factor; clickbench is always shown"
+    name=platform_select
+    data={platform_options}
+    value=platform_id
+    label=platform_label
+    defaultValue="linux|x86_64|c6id.4xlarge"
+    title="Platform"
+    description="OS, CPU architecture and machine type"
 />
-</div>
-<br>
-<!--
-  Single-select, so the charts never mix timings from different hardware. A ButtonGroup selects
-  nothing without a defaultValue - and every query would then match no runs.
--->
-<ButtonGroup
-    name=os_select
-    data={os_options}
-    value=os
-    label=os_label
-    defaultValue="linux"
-    title="Select OS"
-    description="Timings from different operating systems are not comparable"
-/>
-<br>
-<ButtonGroup
-    name=cpu_arch_select
-    data={cpu_arch_options}
-    value=cpu_arch_label
-    defaultValue="x86_64"
-    title="Select CPU architecture"
-    description="Timings from different CPU architectures are not comparable"
-/>
-<br>
-<!--
-  The machine type options follow the OS and CPU architecture above. The group is remounted
-  whenever machine_resolved changes, because a ButtonGroup only applies defaultValue when it mounts:
-  that keeps the highlighted button equal to the machine type the queries filter on.
--->
-{#key machine_resolved?.[0]?.machine_label}
-<ButtonGroup
-    name=machine_select
-    data={machine_options}
-    value=machine_label
-    defaultValue={machine_resolved?.[0]?.machine_label}
-    title="Select machine type"
-    description="Only machine types that have runs on the selected OS and CPU architecture"
-/>
-{/key}
 
-{#if machine_options.dataLoaded && machine_options.length === 0}
-<Alert status="warning">
-No machine type has been benchmarked on the selected OS and CPU architecture.
-</Alert>
-{/if}
+<span class="mt-4 text-xs font-medium">Memory: {selected_platform?.[0]?.memory_label ?? 'Unknown'}</span>
 
-<!--
-  dataLoaded: without it the warning flashes while the query is still running.
-  machine_options.length: when no machine type applies, the warning above already explains the
-  empty page, so this one only covers what machine_options does not look at - the time window and
-  the benchmark / scale-factor selection.
--->
-{#if geomean.dataLoaded && geomean.length === 0 && machine_options.length > 0}
+
+<!-- dataLoaded: without it the warning flashes while the query is still running -->
+{#if geomean.dataLoaded && geomean.length === 0}
 <Alert status="warning">
-No runs match these filters: none of the commits merged in the selected time window has been
-benchmarked with the selected benchmarks and scale factors on this OS, CPU architecture and machine
-type yet.
+No runs match this platform and date range.
 </Alert>
 {/if}
 
 ```sql geomean
 select
-  benchmark_series,
-  benchmark,
-  scale_factor_label,
-  run_timestamp,
-  merge_commit_date,
-  merge_date,
-  geomean_seconds,
-  duckdb_version,
-  duckdb_commit_sha[:8] as commit,
-  machine_label,
-  cpu_arch_label,
-  queries_ok,
-  queries_attempted,
-  queries_failed,
-  is_complete,
-  queries_sha[:8] as query_set,
+  r.benchmark_series,
+  r.benchmark,
+  r.scale_factor_label,
+  r.run_timestamp,
+  r.merge_commit_date,
+  r.merge_date,
+  r.geomean_seconds,
+  r.duckdb_version,
+  r.duckdb_commit_sha as commit_sha,
+  r.duckdb_commit_sha[:8] as commit,
+  p.platform_label as platform,
+  r.machine_label,
+  r.cpu_arch_label,
+  r.queries_ok,
+  r.queries_attempted,
+  r.queries_failed,
+  r.is_complete,
+  r.queries_sha[:8] as query_set,
   -- not displayed: version_baselines matches release runs to the plotted runs on these
-  os,
-  queries_sha
-from benchmarks.geomean_runs
-where storage_type = 'ducklake'
-  and benchmark in ${inputs.benchmark_select.value}
-  -- the scale-factor filter only bites on benchmarks that have one; clickbench (scale_factor
-  -- NULL) is exempt, so narrowing to sf100 does not make it disappear
-  and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and os             = '${inputs.os_select}'
-  and cpu_arch_label = '${inputs.cpu_arch_select}'
-  and machine_label  = (select machine_label from ${machine_resolved})
+  r.os,
+  r.queries_sha
+from benchmarks.geomean_runs r
+join ${platform_options} p
+  on p.platform_id = '${inputs.platform_select.value}'
+ and p.machine_label = r.machine_label
+ and p.cpu_arch_label = r.cpu_arch_label
+ and p.os is not distinct from r.os
+where r.storage_type = 'ducklake'
   -- the date filter is on the commit's merge date, not on when it was benchmarked. Release runs
   -- have no merge date and are deliberately excluded; they remain as the baselines below.
   --
@@ -237,9 +105,9 @@ where storage_type = 'ducklake'
   -- '2026-09-02'. One day compensates for that, the other makes the end day inclusive. The window
   -- can come out a day wider than the picker shows, but never narrower; narrower would drop the
   -- commits merged on the window's last day.
-  and merge_commit_date >= '${inputs.date_select.start}'
-  and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
-order by merge_commit_date, run_timestamp
+  and r.merge_commit_date >= '${inputs.date_select.start}'
+  and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+order by r.merge_commit_date, r.run_timestamp
 ```
 
 ```sql version_baselines
@@ -251,7 +119,7 @@ order by merge_commit_date, run_timestamp
 --
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
 -- narrowing the window should not make it vanish. The releases were measured well before most of
--- the alpha runs. The window only decides which OS and query sets are on the chart to match.
+-- the alpha runs. The window only decides which platform and query sets are on the chart to match.
 select
   r.benchmark_series,
   r.duckdb_version,
@@ -260,8 +128,8 @@ select
 from benchmarks.geomean_runs r
 where r.storage_type = 'ducklake'
   and r.duckdb_version in ('v1.4.5', 'v1.5.5')
-  -- the geomean query already carries the benchmark, scale-factor, machine, CPU and OS filters, so
-  -- matching a row of it applies them here too
+  -- the geomean query already carries the platform filter and identifies each benchmark series,
+  -- so matching a row of it applies both here too
   and exists (
     select 1
     from ${geomean} g
@@ -291,84 +159,32 @@ from (
 group by benchmark_series
 ```
 
-```sql series_shown
-select distinct benchmark_series
-from ${geomean}
-order by benchmark_series
-```
+## TPC-DS @ sf100
 
-## Geometric mean per benchmark
+<BenchmarkSuiteChart
+    data={geomean}
+    baselines={version_baselines}
+    bounds={chart_bounds}
+    series="tpcds @ sf100"
+/>
 
-One chart per benchmark and scale factor. The benchmarks span orders of magnitude, so they do not
-share an axis.
+## TPC-H @ sf100
 
-Each dot is one run, placed at the date its commit was merged; runs of the same commit stack on the
-same date. They are deliberately not connected: consecutive runs are different commits,
-not a continuous measurement, so a line between them would imply a trend that the data does not
-support.
+<BenchmarkSuiteChart
+    data={geomean}
+    baselines={version_baselines}
+    bounds={chart_bounds}
+    series="tpch @ sf100"
+/>
 
-Dashed lines mark what duckdb v1.4.5 and v1.5.5 achieved on that benchmark, so the ongoing
-`v2.0.0-alpha` series can be read against them. Each line is that release's latest run on the same
-machine, OS and query set as the runs in the chart. A version with no such run simply has
-no line there.
+## ClickBench
 
-<!--
-  sort=false keeps the points in the order the geomean query returns them (by merge_commit_date).
-  Evidence's default sort=true reorders the rows by the *y* value, descending, whenever the x
-  column is a string - and merge_date is a varchar - which scrambles the dates along the category
-  axis.
--->
-<script>
-  // x-axis labels as 'Aug 17, 17:10'. Display only: merge_date itself stays the category, so
-  // commits merged on the same day keep separate x positions, and the tooltip keeps the full
-  // timestamp. The time is in the label so that two commits merged on the same day do not both
-  // read 'Aug 17'.
-  // Read from the string rather than through Date, which would shift it into the viewer's
-  // timezone - merge_date is UTC.
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthDayTime = (v) => {
-    const m = /^\d{4}-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(String(v));
-    return m ? `${MONTHS[Number(m[1]) - 1]} ${Number(m[2])}, ${m[3]}` : v;
-  };
-</script>
-
-{#each series_shown as s}
-  <LineChart
-      data={geomean.filter(d => d.benchmark_series === s.benchmark_series)}
-      x=merge_date
-      xType=category
-      showAllXAxisLabels=false
-      echartsOptions={{ xAxis: { axisLabel: { formatter: monthDayTime } } }}
-      y=geomean_seconds
-      yMax={chart_bounds.find(b => b.benchmark_series === s.benchmark_series)?.y_max}
-      title={s.benchmark_series}
-      yAxisTitle="geomean (seconds)"
-      markers=true
-      lineWidth=0
-      sort=false
-  >
-      <ReferenceLine
-          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.4.5')}
-          y=baseline_seconds
-          label=duckdb_version
-          hideValue=true
-          lineType=dashed
-          color={['#c2410c', '#fb923c']}
-          labelPosition=aboveEnd
-          emptySet=pass
-      />
-      <ReferenceLine
-          data={version_baselines.filter(d => d.benchmark_series === s.benchmark_series && d.duckdb_version === 'v1.5.5')}
-          y=baseline_seconds
-          label=duckdb_version
-          hideValue=true
-          lineType=dashed
-          color={['#0f766e', '#2dd4bf']}
-          labelPosition=belowEnd
-          emptySet=pass
-      />
-  </LineChart>
-{/each}
+<BenchmarkSuiteChart
+    data={geomean}
+    baselines={version_baselines}
+    bounds={chart_bounds}
+    series="clickbench"
+/>
 
 ## Runs
 
@@ -381,33 +197,21 @@ select
   merge_date,
   duckdb_version,
   commit,
-  round(geomean_seconds, 4) as 'geomean (s)',
+  round(geomean_seconds, 3) as 'geomean (sec)',
   queries_ok as '# ok',
   queries_failed as '# failed',
-  machine_label,
-  cpu_arch_label,
+  platform,
   query_set
 from ${geomean}
 order by merge_commit_date desc, run_timestamp desc
 ```
 
-<DataTable data={run_table} rows=25 search=true>
-    <Column id=benchmark_series />
-    <Column id=merge_date />
-    <Column id=duckdb_version />
-    <Column id=commit />
-    <Column id='geomean (s)' />
-    <Column id='# ok' />
-    <Column id='# failed' />
-    <Column id=machine_label />
-    <Column id=cpu_arch_label />
-    <Column id=query_set />
-</DataTable>
+<BenchmarkRunsTable data={run_table} />
 
 ## Per-query execution times
 
 The individual queries of a single run, each against the two release baselines on the selected
-machine type, CPU architecture and OS. Every timing of the release baselines is a median over that query's warm runs.
+platform. Every timing of the release baselines is a median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
 slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
@@ -418,20 +222,20 @@ listed with empty timings.
 
 ```sql run_options
 select
-  run_id,
-  run_date || '  -  ' || benchmark_series || '  -  ' || duckdb_version as run_label,
-  run_timestamp
-from benchmarks.geomean_runs
-where storage_type = 'ducklake'
-  and benchmark in ${inputs.benchmark_select.value}
-  and (scale_factor is null or scale_factor_label in ${inputs.sf_select.value})
-  and os             = '${inputs.os_select}'
-  and cpu_arch_label = '${inputs.cpu_arch_select}'
-  and machine_label  = (select machine_label from ${machine_resolved})
+  r.run_id,
+  r.run_date || '  -  ' || r.benchmark_series || '  -  ' || r.duckdb_version as run_label,
+  r.run_timestamp
+from benchmarks.geomean_runs r
+join ${platform_options} p
+  on p.platform_id = '${inputs.platform_select.value}'
+ and p.machine_label = r.machine_label
+ and p.cpu_arch_label = r.cpu_arch_label
+ and p.os is not distinct from r.os
+where r.storage_type = 'ducklake'
   -- same date filter as the geomean query above - see there for the two-day end bound
-  and merge_commit_date >= '${inputs.date_select.start}'
-  and merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
-order by run_timestamp desc
+  and r.merge_commit_date >= '${inputs.date_select.start}'
+  and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+order by r.run_timestamp desc
 ```
 
 <Dropdown
@@ -463,13 +267,15 @@ baselines as (
     query,
     duckdb_version,
     median(median_seconds) as baseline_seconds
-  from benchmarks.query_times
-  where storage_type = 'ducklake'
-    and duckdb_version in ('v1.4.5', 'v1.5.5')
-    and os             = '${inputs.os_select}'
-    and cpu_arch_label = '${inputs.cpu_arch_select}'
-    and machine_label  = (select machine_label from ${machine_resolved})
-  group by benchmark_series, query, duckdb_version
+  from benchmarks.query_times q
+  join ${platform_options} p
+    on p.platform_id = '${inputs.platform_select.value}'
+   and p.machine_label = q.machine_label
+   and p.cpu_arch_label = q.cpu_arch_label
+   and p.os is not distinct from q.os
+  where q.storage_type = 'ducklake'
+    and q.duckdb_version in ('v1.4.5', 'v1.5.5')
+  group by q.benchmark_series, q.query, q.duckdb_version
 )
 select
   s.query,
@@ -536,31 +342,4 @@ order by coalesce("ratio vs v1.5.5", "ratio vs v1.4.5") desc nulls last,
   data is the query object itself, deliberately: search=true pushes the search down into SQL and
   is silently dropped if it is handed plain rows instead.
 -->
-<DataTable data={query_times} rows=20 search=true>
-    <Column id=query />
-    <Column id='median (s)' />
-    <Column id='v1.5.5 (s)' />
-    <Column id='v1.4.5 (s)' />
-    <Column
-        id='ratio vs v1.5.5'
-        fmt=num2
-        contentType=colorscale
-        scaleColumn='v1.5.5 color'
-        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
-        colorBreakpoints={[-1, 1]}
-        colorMin={-1}
-        colorMax={1}
-    />
-    <Column
-        id='ratio vs v1.4.5'
-        fmt=num2
-        contentType=colorscale
-        scaleColumn='v1.4.5 color'
-        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
-        colorBreakpoints={[-1, 1]}
-        colorMin={-1}
-        colorMax={1}
-    />
-    <Column id='# warm runs' />
-    <Column id=status />
-</DataTable>
+<BenchmarkQueryTimesTable data={query_times} />

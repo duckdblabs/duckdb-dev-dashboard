@@ -23,51 +23,9 @@ where storage_type = 'duckdb'
 <br>
 
 ```sql platform_options
--- A platform is the combination of OS, CPU architecture and machine type: timings from different
--- combinations are not comparable. The hardware details are curated because the benchmark lake
--- does not record vCPU count, RAM or OS version. Unknown combinations retain a generic label
--- rather than disappearing from the dashboard.
-select distinct
-  concat_ws('|', coalesce(os, 'unknown'), cpu_arch_label, machine_label) as platform_id,
-  os,
-  cpu_arch_label,
-  machine_label,
-  case
-    when os = 'linux' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
-      then 'Ubuntu 24.04 (amd64, 16 vCPU)'
-    when os = 'linux' and cpu_arch_label = 'arm64' and machine_label = 'c7gd.4xlarge'
-      then 'Ubuntu 24.04 (arm64, 16 vCPU)'
-    when os = 'macos' and cpu_arch_label = 'arm64' and machine_label = 'mac-m4.metal'
-      then 'macOS m4 (arm64, 10 vCPU)'
-    when os = 'windows' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
-      then 'Windows Server 2025 (amd64, 16 vCPU)'
-    else
-      (case coalesce(os, 'unknown')
-        when 'linux' then 'Linux'
-        when 'macos' then 'macOS'
-        when 'windows' then 'Windows'
-        else coalesce(os, 'Unknown OS')
-      end)
-      || ' ('
-      || (case cpu_arch_label when 'x86_64' then 'amd64' else cpu_arch_label end)
-      || ', '
-      || (case machine_label when 'unspecified' then 'instance unspecified' else machine_label end)
-      || ')'
-  end as platform_label,
-  case
-    when os = 'linux' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
-      then '32 GiB'
-    when os = 'linux' and cpu_arch_label = 'arm64' and machine_label = 'c7gd.4xlarge'
-      then '32 GiB'
-    when os = 'macos' and cpu_arch_label = 'arm64' and machine_label = 'mac-m4.metal'
-      then '24 GiB'
-    when os = 'windows' and cpu_arch_label = 'x86_64' and machine_label = 'c6id.4xlarge'
-      then '32 GiB'
-    else 'Unknown'
-  end as memory_label
-from benchmarks.geomean_runs
+select platform_id, os, cpu_arch_label, machine_label, platform_label, memory_label
+from benchmarks.platforms
 where storage_type = 'duckdb'
-  and merge_commit_date is not null
 order by platform_label collate nocase, platform_label
 ```
 
@@ -188,196 +146,32 @@ from (
 group by benchmark_series
 ```
 
-<script>
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  // Evidence normalizes timestamp strings without a timezone before passing them to ECharts.
-  // Local getters preserve those UTC wall-clock values instead of applying the browser timezone.
-  const chartDate = (value) => {
-    if (value instanceof Date) return value;
-    if (typeof value === 'number') return new Date(value);
-    return new Date(String(value).replace(' ', 'T').replace(/Z$/, ''));
-  };
-
-  const chartTime = (value) => chartDate(value).getTime();
-  const twoDigits = (value) => String(value).padStart(2, '0');
-
-  const shortDate = (value) => {
-    const date = chartDate(value);
-    return Number.isNaN(date.getTime()) ? String(value) : `${MONTHS[date.getMonth()]} ${date.getDate()}`;
-  };
-
-  const fullTimestamp = (value) => {
-    const date = chartDate(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}:${twoDigits(date.getSeconds())} UTC`;
-  };
-
-  const isCommitSha = (value) => /^[0-9a-f]{7,40}$/i.test(value ?? '');
-
-  const benchmarkChartOptions = (rows) => {
-    // A commit can have multiple benchmark runs. De-duplicate it before assigning predecessors so
-    // repeated runs compare against the previous benchmarked commit, not against each other.
-    const commits = [...new Set(
-      rows
-        .filter((row) => isCommitSha(row.commit_sha))
-        .sort((a, b) => chartTime(a.merge_commit_date) - chartTime(b.merge_commit_date)
-          || a.commit_sha.localeCompare(b.commit_sha))
-        .map((row) => row.commit_sha)
-    )];
-    const previousCommitBySha = new Map(
-      commits.slice(1).map((commitSha, index) => [commitSha, commits[index]])
-    );
-
-    return {
-      xAxis: {
-        // splitNumber is a target rather than a hard count. The one-day minimum prevents a 30- or
-        // 90-day view from filling the axis with timestamp-level ticks.
-        splitNumber: 6,
-        minInterval: 24 * 60 * 60 * 1000,
-        axisLabel: { formatter: shortDate }
-      },
-      tooltip: {
-        trigger: 'item',
-        renderMode: 'html',
-        enterable: true,
-        hideDelay: 300,
-        confine: true,
-        formatter: (params) => {
-          const point = Array.isArray(params) ? params[0] : params;
-          if (!Array.isArray(point?.value)) return '';
-
-          const [timestamp, geomean] = point.value;
-          const row = rows.find((candidate) =>
-            chartTime(candidate.merge_commit_date) === chartTime(timestamp)
-            && Number(candidate.geomean_seconds) === Number(geomean)
-          );
-          const commitSha = row?.commit_sha ?? '';
-          const commitLabel = row?.commit ?? commitSha.slice(0, 8);
-          const previousCommitSha = previousCommitBySha.get(commitSha);
-          const commitLink = isCommitSha(commitSha)
-            ? `<a href="https://github.com/duckdb/duckdb/commit/${commitSha}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${commitLabel}</a>`
-            : 'Unknown';
-          const comparisonLinks = previousCommitSha
-            ? ` (<a href="https://github.com/duckdb/duckdb/compare/${previousCommitSha}..${commitSha}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">range</a>, <a href="https://github.com/duckdb/duckdb/compare/${previousCommitSha}...${commitSha}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">PRs</a>)`
-            : '';
-          const seconds = Number.isFinite(Number(geomean)) ? Number(geomean).toFixed(3) : 'Unknown';
-          const mergedAt = fullTimestamp(row?.merge_commit_date ?? timestamp);
-
-          return `<strong>Merged ${mergedAt}</strong><br>geomean (sec): ${seconds}<br>commit: ${commitLink}${comparisonLinks}`;
-        }
-      }
-    };
-  };
-</script>
-
 ## TPC-DS @ sf100
 
-<LineChart
-    data={geomean.filter(d => d.benchmark_series === 'tpcds @ sf100')}
-    x=merge_commit_date
-    xType=time
-    echartsOptions={benchmarkChartOptions(geomean.filter(d => d.benchmark_series === 'tpcds @ sf100'))}
-    y=geomean_seconds
-    yFmt=num3
-    yMax={chart_bounds.find(b => b.benchmark_series === 'tpcds @ sf100')?.y_max}
-    yAxisTitle="geomean (sec)"
-    markers=true
-    lineWidth=0
->
-    <ReferenceLine
-        data={version_baselines.filter(d => d.benchmark_series === 'tpcds @ sf100' && d.duckdb_version === 'v1.4.5')}
-        y=baseline_seconds
-        label=duckdb_version
-        hideValue=true
-        lineType=dashed
-        color={['#c2410c', '#fb923c']}
-        labelPosition=aboveEnd
-        emptySet=pass
-    />
-    <ReferenceLine
-        data={version_baselines.filter(d => d.benchmark_series === 'tpcds @ sf100' && d.duckdb_version === 'v1.5.5')}
-        y=baseline_seconds
-        label=duckdb_version
-        hideValue=true
-        lineType=dashed
-        color={['#0f766e', '#2dd4bf']}
-        labelPosition=belowEnd
-        emptySet=pass
-    />
-</LineChart>
+<BenchmarkSuiteChart
+    data={geomean}
+    baselines={version_baselines}
+    bounds={chart_bounds}
+    series="tpcds @ sf100"
+/>
 
 ## TPC-H @ sf100
 
-<LineChart
-    data={geomean.filter(d => d.benchmark_series === 'tpch @ sf100')}
-    x=merge_commit_date
-    xType=time
-    echartsOptions={benchmarkChartOptions(geomean.filter(d => d.benchmark_series === 'tpch @ sf100'))}
-    y=geomean_seconds
-    yFmt=num3
-    yMax={chart_bounds.find(b => b.benchmark_series === 'tpch @ sf100')?.y_max}
-    yAxisTitle="geomean (sec)"
-    markers=true
-    lineWidth=0
->
-    <ReferenceLine
-        data={version_baselines.filter(d => d.benchmark_series === 'tpch @ sf100' && d.duckdb_version === 'v1.4.5')}
-        y=baseline_seconds
-        label=duckdb_version
-        hideValue=true
-        lineType=dashed
-        color={['#c2410c', '#fb923c']}
-        labelPosition=aboveEnd
-        emptySet=pass
-    />
-    <ReferenceLine
-        data={version_baselines.filter(d => d.benchmark_series === 'tpch @ sf100' && d.duckdb_version === 'v1.5.5')}
-        y=baseline_seconds
-        label=duckdb_version
-        hideValue=true
-        lineType=dashed
-        color={['#0f766e', '#2dd4bf']}
-        labelPosition=belowEnd
-        emptySet=pass
-    />
-</LineChart>
+<BenchmarkSuiteChart
+    data={geomean}
+    baselines={version_baselines}
+    bounds={chart_bounds}
+    series="tpch @ sf100"
+/>
 
 ## ClickBench
 
-<LineChart
-    data={geomean.filter(d => d.benchmark_series === 'clickbench')}
-    x=merge_commit_date
-    xType=time
-    echartsOptions={benchmarkChartOptions(geomean.filter(d => d.benchmark_series === 'clickbench'))}
-    y=geomean_seconds
-    yFmt=num3
-    yMax={chart_bounds.find(b => b.benchmark_series === 'clickbench')?.y_max}
-    yAxisTitle="geomean (sec)"
-    markers=true
-    lineWidth=0
->
-    <ReferenceLine
-        data={version_baselines.filter(d => d.benchmark_series === 'clickbench' && d.duckdb_version === 'v1.4.5')}
-        y=baseline_seconds
-        label=duckdb_version
-        hideValue=true
-        lineType=dashed
-        color={['#c2410c', '#fb923c']}
-        labelPosition=aboveEnd
-        emptySet=pass
-    />
-    <ReferenceLine
-        data={version_baselines.filter(d => d.benchmark_series === 'clickbench' && d.duckdb_version === 'v1.5.5')}
-        y=baseline_seconds
-        label=duckdb_version
-        hideValue=true
-        lineType=dashed
-        color={['#0f766e', '#2dd4bf']}
-        labelPosition=belowEnd
-        emptySet=pass
-    />
-</LineChart>
+<BenchmarkSuiteChart
+    data={geomean}
+    baselines={version_baselines}
+    bounds={chart_bounds}
+    series="clickbench"
+/>
 
 ## Runs
 
@@ -399,17 +193,7 @@ from ${geomean}
 order by merge_commit_date desc, run_timestamp desc
 ```
 
-<DataTable data={run_table} rows=25 search=true>
-    <Column id=benchmark_series />
-    <Column id=merge_date />
-    <Column id=duckdb_version />
-    <Column id=commit />
-    <Column id='geomean (sec)' fmt=num3 />
-    <Column id='# ok' />
-    <Column id='# failed' />
-    <Column id=platform />
-    <Column id=query_set />
-</DataTable>
+<BenchmarkRunsTable data={run_table} />
 
 ## Per-query execution times
 
@@ -545,31 +329,4 @@ order by coalesce("ratio vs v1.5.5", "ratio vs v1.4.5") desc nulls last,
   data is the query object itself, deliberately: search=true pushes the search down into SQL and
   is silently dropped if it is handed plain rows instead.
 -->
-<DataTable data={query_times} rows=20 search=true>
-    <Column id=query />
-    <Column id='median (s)' />
-    <Column id='v1.5.5 (s)' />
-    <Column id='v1.4.5 (s)' />
-    <Column
-        id='ratio vs v1.5.5'
-        fmt=num2
-        contentType=colorscale
-        scaleColumn='v1.5.5 color'
-        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
-        colorBreakpoints={[-1, 1]}
-        colorMin={-1}
-        colorMax={1}
-    />
-    <Column
-        id='ratio vs v1.4.5'
-        fmt=num2
-        contentType=colorscale
-        scaleColumn='v1.4.5 color'
-        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
-        colorBreakpoints={[-1, 1]}
-        colorMin={-1}
-        colorMax={1}
-    />
-    <Column id='# warm runs' />
-    <Column id=status />
-</DataTable>
+<BenchmarkQueryTimesTable data={query_times} />
