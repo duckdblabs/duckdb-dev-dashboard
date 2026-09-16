@@ -7,8 +7,12 @@
 -- mean_seconds is the value that feeds the geomean (benchmark_geomean.sql's per_query CTE).
 -- median_seconds is carried alongside it because they answer different questions: a large gap
 -- between the two means the warm runs of that query were noisy, which is worth seeing before
--- reading anything into a small change. median_seconds should also agree with the harness's own
--- query_results.median_seconds, which is computed independently over the same timed runs.
+-- reading anything into a small change.
+--
+-- median_seconds is the harness's own query_results.median_seconds rather than recomputed here.
+-- Timings are recorded to the millisecond, so a sub-millisecond run is stored as 0.0. The harness
+-- median counts those; the aggregates below drop non-positive timings, which would report such a
+-- query as 0.001 even when most of its runs were 0.0.
 --
 -- Failed queries are kept, with NULL timings and their error - this is the one place where the
 -- failure is attributable to a specific query, so hiding them here would waste the table.
@@ -24,7 +28,6 @@ with warm_runs as (
         qm.run_id,
         qm.query,
         avg(qm.metric_value)    as mean_seconds,
-        median(qm.metric_value) as median_seconds,
         min(qm.metric_value)    as fastest_seconds,
         max(qm.metric_value)    as slowest_seconds,
         count(*)                as timed_runs
@@ -54,7 +57,7 @@ select
     qr.status,          -- 'ok' or 'failed'
     qr.verified,        -- false when the query was timed but its result never checked
     qr.error,
-    w.median_seconds,
+    qr.median_seconds,
     w.mean_seconds,
     w.fastest_seconds,
     w.slowest_seconds,

@@ -401,7 +401,8 @@ order by merge_commit_date desc, run_timestamp desc
 ## Per-query execution times
 
 The individual queries of a single run, each against the two release baselines on the selected
-machine type, CPU architecture and OS. Every timing of the release baselines is a median over that query's warm runs.
+machine type, CPU architecture and OS. A release baseline is that release's latest run, and each
+timing is the median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
 slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
@@ -456,7 +457,9 @@ baselines as (
     benchmark_series,
     query,
     duckdb_version,
-    median(median_seconds) as baseline_seconds
+    -- the latest run of that version, as for the chart baselines: most releases were run once,
+    -- but a few were re-run, and a timing from a run should not be blended with another run's
+    arg_max(median_seconds, run_timestamp) as baseline_seconds
   from benchmarks.query_times
   where storage_type = 'duckdb'
     and duckdb_version in ('v1.4.5', 'v1.5.5')
