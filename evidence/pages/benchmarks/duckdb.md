@@ -153,6 +153,10 @@ group by benchmark_series
     baselines={version_baselines}
     bounds={chart_bounds}
     series="tpcds @ sf100"
+    storage="duckdb"
+    platform={inputs.platform_select.value}
+    dateStart={inputs.date_select.start}
+    dateEnd={inputs.date_select.end}
 />
 
 ## TPC-H @ sf100
@@ -162,6 +166,10 @@ group by benchmark_series
     baselines={version_baselines}
     bounds={chart_bounds}
     series="tpch @ sf100"
+    storage="duckdb"
+    platform={inputs.platform_select.value}
+    dateStart={inputs.date_select.start}
+    dateEnd={inputs.date_select.end}
 />
 
 ## ClickBench
@@ -171,6 +179,10 @@ group by benchmark_series
     baselines={version_baselines}
     bounds={chart_bounds}
     series="clickbench"
+    storage="duckdb"
+    platform={inputs.platform_select.value}
+    dateStart={inputs.date_select.start}
+    dateEnd={inputs.date_select.end}
 />
 
 ## Runs
