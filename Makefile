@@ -4,11 +4,11 @@ all: run_feeds generate_sources build
 
 # create persistent ducklake secrets
 secrets:
-	python3 -m utils.create_ducklake_secrets
+	.venv/bin/python3 -m utils.create_ducklake_secrets
 
 # run feeds to update the ducklake
 run_feeds:
-	python3 -m feeds.run_feeds
+	.venv/bin/python3 -m feeds.run_feeds
 
 maintain:
 	duckdb -f utils/maintenance.sql
@@ -17,7 +17,7 @@ maintain:
 # only 'benchmarks': the lake behind ci_metrics and extension_downloads is gone (deleted
 # CloudFlare account), so attaching it would fail the build. drop the arg to restore them.
 generate_sources:
-	python3 -m evidence.sources.generate_sources benchmarks
+	.venv/bin/python3 -m evidence.sources.generate_sources benchmarks
 
 # build the front-end; this creates a parquet file per table in duckdb file
 build:
@@ -35,7 +35,7 @@ venv:
 
 # create a local copy of the ducklake, and secret: 'ducklake_secret_local'
 sync_local:
-	python3 -m utils.sync_local
+	.venv/bin/python3 -m utils.sync_local
 
 run_feeds_local:
-	python3 -m feeds.run_feeds local
+	.venv/bin/python3 -m feeds.run_feeds local

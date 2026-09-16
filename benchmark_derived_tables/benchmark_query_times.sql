@@ -38,6 +38,8 @@ select
     r.run_id,
     r."timestamp"       as run_timestamp,
     strftime(r."timestamp", '%Y-%m-%d %H:%M') as run_date,
+    r.merge_commit_date,
+    strftime(r.merge_commit_date, '%Y-%m-%d %H:%M') as merge_date,
     r.benchmark,
     r.benchmark_name,
     r.storage_type,     -- one dashboard page per value
