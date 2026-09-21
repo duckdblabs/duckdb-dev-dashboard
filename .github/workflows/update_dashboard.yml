@@ -38,9 +38,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install Python dependencies
+        run: make venv
       - name: Update DuckLake
         run: |
-          python3 -m pip install -r requirements.txt
           make secrets
           make run_feeds
 
@@ -51,6 +58,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install Python dependencies
+        run: make venv
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -65,7 +80,6 @@ jobs:
           BASE_PATH: '/${{ github.event.repository.name }}'
           NODE_OPTIONS: "--max_old_space_size=7168"
         run: |
-          python3 -m pip install -r requirements.txt
           make secrets
           make generate_sources
           make build
