@@ -186,28 +186,6 @@ group by benchmark_series
     dateEnd={inputs.date_select.end}
 />
 
-## Runs
-
-A run with failed queries is still plotted, but its geomean covers fewer queries than a complete
-run - `# failed` is what tells them apart.
-
-```sql run_table
-select
-  benchmark_series,
-  merge_date,
-  duckdb_version,
-  commit,
-  round(geomean_seconds, 3) as 'geomean (sec)',
-  queries_ok as '# ok',
-  queries_failed as '# failed',
-  platform,
-  query_set
-from ${geomean}
-order by merge_commit_date desc, run_timestamp desc
-```
-
-<BenchmarkRunsTable data={run_table} />
-
 ## Per-query execution times
 
 The individual queries of a single run, each against the two release baselines on the selected

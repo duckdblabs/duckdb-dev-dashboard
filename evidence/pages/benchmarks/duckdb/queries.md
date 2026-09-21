@@ -47,32 +47,12 @@ from (
 order by suite_label
 ```
 
-<Dropdown
-    name=suite_select
-    data={suite_options}
-    value=benchmark_series
-    label=suite_label
-    defaultValue={initialSuite}
-    title="Benchmark suite"
-/>
-
 ```sql date_options
 select merge_commit_date::date as merge_commit_date
 from benchmarks.query_times
 where storage_type = 'duckdb'
   and merge_commit_date is not null
 ```
-
-<DateRange
-    name=date_select
-    data={date_options}
-    dates=merge_commit_date
-    start={initialStart}
-    end={initialEnd}
-    defaultValue={validWindow ? undefined : 'Last 90 Days'}
-/>
-
-<br>
 
 ```sql platform_options
 select platform_id, os, cpu_arch_label, machine_label, platform_label, memory_label
@@ -87,17 +67,45 @@ from ${platform_options}
 where platform_id = '${inputs.platform_select.value}'
 ```
 
-<Dropdown
-    name=platform_select
-    data={platform_options}
-    value=platform_id
-    label=platform_label
-    defaultValue={initialPlatform}
-    title="Platform"
-    description="OS, CPU architecture and machine type"
-/>
+<div class="mb-6 flex flex-wrap items-end gap-x-3 rounded-lg border border-base-300 bg-base-100 p-4">
+  <div class="min-w-[15rem]">
+    <Dropdown
+        name=suite_select
+        data={suite_options}
+        value=benchmark_series
+        label=suite_label
+        defaultValue={initialSuite}
+        title="Benchmark suite"
+    />
+  </div>
 
-<span class="mt-4 text-xs font-medium">Memory: {selected_platform?.[0]?.memory_label ?? 'Unknown'}</span>
+  <div>
+    <DateRange
+        name=date_select
+        data={date_options}
+        dates=merge_commit_date
+        start={initialStart}
+        end={initialEnd}
+        defaultValue={validWindow ? undefined : 'Last 90 Days'}
+        title="Time window"
+    />
+  </div>
+
+  <div class="flex min-w-[20rem] items-end gap-2">
+    <Dropdown
+        name=platform_select
+        data={platform_options}
+        value=platform_id
+        label=platform_label
+        defaultValue={initialPlatform}
+        title="Platform"
+        description="OS, CPU architecture and machine type"
+    />
+    <span class="mb-4 whitespace-nowrap text-xs font-medium">
+      Memory: {selected_platform?.[0]?.memory_label ?? 'Unknown'}
+    </span>
+  </div>
+</div>
 
 <BenchmarkExplorerUrlSync />
 
