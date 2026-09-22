@@ -3,9 +3,10 @@
 </script>
 
 <script>
-  import { LineChart, ReferenceLine } from '@evidence-dev/core-components';
+  import { ECharts } from '@evidence-dev/core-components';
   import BenchmarkQueryLink from './BenchmarkQueryLink.svelte';
   import {
+    chartDate,
     chartTime,
     commitLinks,
     escapeHtml,
@@ -20,7 +21,7 @@
 
   export let data = [];
   export let baselines = [];
-  export let bounds = [];
+  export let failures = [];
   export let series;
   export let storage = undefined;
   export let platform = undefined;
@@ -28,91 +29,146 @@
   export let dateEnd = undefined;
   export let version = undefined;
 
-  const chartOptions = (rows) => {
+  const BASELINE_COLORS = { 'v1.4.5': '#ea580c', 'v1.5.5': '#0d9488' };
+
+  const dateBound = (value, extraDays = 0) => {
+    const date = chartDate(value);
+    if (Number.isNaN(date.getTime())) return undefined;
+    date.setDate(date.getDate() + extraDays);
+    return date.getTime();
+  };
+
+  const isComplete = (row) => Number(row.queries_failed ?? 0) === 0;
+
+  const chartConfig = (rows, baselineRows, failedByRun) => {
     const previousCommitBySha = previousCommitMap(rows);
+    const lineOrder = versionLineOrder(rows.map((row) => versionLine(row.duckdb_version)));
+    const lineColors = versionLineColors(lineOrder);
+
+    const values = [
+      ...rows.map((row) => Number(row.geomean_seconds)),
+      ...baselineRows.map((row) => Number(row.baseline_seconds))
+    ].filter(Number.isFinite);
+    // headroom above the tallest element: a reference line exactly at the chart maximum sits on
+    // the plot border and is indistinguishable from it
+    const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
+    const times = rows.map((row) => chartTime(row.merge_commit_date));
+    const xMin = dateBound(dateStart) ?? Math.min(...times);
+    // the page query's end bound is end + 2 days; see the geomean query for why
+    const xMax = dateBound(dateEnd, 2) ?? Math.max(...times);
+
+    const tooltip = (params) => {
+      const row = params?.data?.row;
+      if (!row) return '';
+      const previousCommitSha = previousCommitBySha.get(row.commit_sha);
+      const mergedAt = escapeHtml(fullTimestamp(row.merge_commit_date));
+      const lines = [
+        `<strong>Merged ${mergedAt}</strong>`,
+        `version: ${escapeHtml(row.duckdb_version ?? 'Unknown')}`,
+        `geomean (sec): ${formatSeconds(row.geomean_seconds)}`,
+        `commit: ${commitLinks(row, previousCommitSha)}`
+      ];
+
+      if (!isComplete(row)) {
+        const failed = failedByRun.get(row.run_id);
+        lines.push(
+          `<span style="color:#ef4444;font-weight:600;">${row.queries_ok} of ${row.queries_attempted} queries ok</span>`
+          + (failed ? ` — failed: ${escapeHtml(failed)}` : '')
+        );
+      }
+      return lines.join('<br>');
+    };
+
+    const runSeries = lineOrder.map((line) => ({
+      name: line,
+      type: 'line',
+      data: rows
+        .filter((row) => versionLine(row.duckdb_version) === line)
+        .map((row) => ({
+          value: [chartTime(row.merge_commit_date), Number(row.geomean_seconds)],
+          row,
+          // hollow marker: the run lost queries, so its geomean is over a smaller set
+          ...(isComplete(row) ? {} : {
+            itemStyle: { color: '#ffffff', borderColor: lineColors[line], borderWidth: 2 }
+          })
+        })),
+      showSymbol: true,
+      symbol: 'circle',
+      symbolSize: 8,
+      lineStyle: { width: 0 },
+      itemStyle: { color: lineColors[line] }
+    }));
+
+    const baselineSeries = baselineRows
+      .filter((row) => Number.isFinite(Number(row.baseline_seconds)))
+      .map((row) => ({
+        name: row.duckdb_version,
+        type: 'line',
+        data: [[xMin, Number(row.baseline_seconds)], [xMax, Number(row.baseline_seconds)]],
+        showSymbol: false,
+        silent: true,
+        lineStyle: { type: 'dashed', width: 1, color: BASELINE_COLORS[row.duckdb_version] ?? '#64748b' },
+        endLabel: {
+          show: true,
+          formatter: row.duckdb_version,
+          color: BASELINE_COLORS[row.duckdb_version] ?? '#64748b',
+          fontSize: 10
+        }
+      }));
 
     return {
-      xAxis: {
-        // splitNumber is a target rather than a hard count. The one-day minimum prevents a 30- or
-        // 90-day view from filling the axis with timestamp-level ticks.
-        splitNumber: 6,
-        minInterval: 24 * 60 * 60 * 1000,
-        axisLabel: { formatter: shortDate }
-      },
+      animation: false,
+      grid: { left: 64, right: 56, top: 16, bottom: 44 },
+      legend: lineOrder.length > 1
+        ? { show: true, top: 0, right: 56, data: lineOrder }
+        : { show: false },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
         enterable: true,
         hideDelay: 300,
         confine: true,
-        formatter: (params) => {
-          const point = Array.isArray(params) ? params[0] : params;
-          if (!Array.isArray(point?.value)) return '';
-
-          const [timestamp, geomean] = point.value;
-          const row = rows.find((candidate) =>
-            chartTime(candidate.merge_commit_date) === chartTime(timestamp)
-            && Number(candidate.geomean_seconds) === Number(geomean)
-          );
-          const commitSha = row?.commit_sha ?? '';
-          const previousCommitSha = previousCommitBySha.get(commitSha);
-          const seconds = formatSeconds(geomean);
-          const mergedAt = fullTimestamp(row?.merge_commit_date ?? timestamp);
-          const version = escapeHtml(row?.duckdb_version ?? point.seriesName ?? 'Unknown');
-
-          return `<strong>Merged ${mergedAt}</strong><br>version: ${version}<br>geomean (sec): ${seconds}<br>commit: ${commitLinks(row, previousCommitSha)}`;
-        }
-      }
+        formatter: tooltip
+      },
+      xAxis: {
+        type: 'time',
+        min: xMin,
+        max: xMax,
+        splitNumber: 6,
+        minInterval: 24 * 60 * 60 * 1000,
+        axisLabel: { formatter: shortDate }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: yMax,
+        name: 'geomean (sec)',
+        nameLocation: 'middle',
+        nameGap: 48,
+        axisLabel: { formatter: (value) => Number(value).toFixed(3) }
+      },
+      series: [...runSeries, ...baselineSeries]
     };
   };
 
-  // One plotted series per release line, so main and the maintenance branch are separate colours.
-  $: rows = (data?.filter?.((row) => row.benchmark_series === series) ?? [])
-    .map((row) => ({ ...row, version_line: versionLine(row.duckdb_version) }));
-  $: lines = rows.map((row) => row.version_line);
-  $: lineOrder = versionLineOrder(lines);
-  $: lineColors = versionLineColors(lineOrder);
+  $: rows = data?.filter?.((row) => row.benchmark_series === series) ?? [];
   $: baselineRows = baselines?.filter?.((row) => row.benchmark_series === series) ?? [];
-  $: yMax = bounds?.find?.((row) => row.benchmark_series === series)?.y_max;
+  $: runIds = new Set(rows.map((row) => row.run_id));
+  $: failedByRun = new Map(
+    (failures ?? []).filter((row) => runIds.has(row.run_id)).map((row) => [row.run_id, row.failed_queries])
+  );
+  $: incompleteCount = rows.filter((row) => !isComplete(row)).length;
+  $: config = chartConfig(rows, baselineRows, failedByRun);
 </script>
 
 {#if rows.length > 0}
-  <LineChart
-      data={rows}
-      x=merge_commit_date
-      xType=time
-      echartsOptions={chartOptions(rows)}
-      y=geomean_seconds
-      series=version_line
-      seriesOrder={lineOrder}
-      seriesColors={lineColors}
-      yFmt=num3
-      {yMax}
-      yAxisTitle="geomean (sec)"
-      markers=true
-      lineWidth=0
-  >
-      <ReferenceLine
-          data={baselineRows.filter((row) => row.duckdb_version === 'v1.4.5')}
-          y=baseline_seconds
-          label=duckdb_version
-          hideValue=true
-          lineType=dashed
-          color={['#c2410c', '#fb923c']}
-          labelPosition=aboveEnd
-          emptySet=pass
-      />
-      <ReferenceLine
-          data={baselineRows.filter((row) => row.duckdb_version === 'v1.5.5')}
-          y=baseline_seconds
-          label=duckdb_version
-          hideValue=true
-          lineType=dashed
-          color={['#0f766e', '#2dd4bf']}
-          labelPosition=belowEnd
-          emptySet=pass
-      />
-  </LineChart>
+  {#if incompleteCount > 0}
+    <p class="text-xs text-base-content-muted">
+      {incompleteCount} of {rows.length} runs are incomplete (hollow markers): some queries failed, so their
+      geomean is over fewer queries and not directly comparable.
+    </p>
+  {/if}
+  <ECharts {config} data={rows} height="320px" />
   {#if storage && platform && dateStart && dateEnd}
     <BenchmarkQueryLink
         {storage}
