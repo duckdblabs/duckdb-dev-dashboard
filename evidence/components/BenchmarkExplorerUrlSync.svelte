@@ -15,7 +15,8 @@
     const platform = values.platform_select?.value;
     const start = values.date_select?.start;
     const end = values.date_select?.end;
-    if (!suite || !platform || !start || !end) return;
+    const version = values.version_select?.value;
+    if (!suite || !platform || !start || !end || !version) return;
 
     // SvelteKit's shallow replaceState updates the address bar but intentionally leaves
     // $page.url unchanged. Use the real browser location so repeated Evidence input emissions do
@@ -25,6 +26,7 @@
     url.searchParams.set('platform', platform);
     url.searchParams.set('start', start);
     url.searchParams.set('end', end);
+    url.searchParams.set('version', version);
     if (url.href !== window.location.href) replaceState(url, $page.state);
   };
 
