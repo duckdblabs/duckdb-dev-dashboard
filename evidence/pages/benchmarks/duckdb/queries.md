@@ -13,7 +13,7 @@ hide_toc: true
   const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
     && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
   const validPlatform = (value) => /^[a-z0-9._-]+\|[a-z0-9._-]+\|[a-z0-9._-]+$/i.test(value ?? '');
-  const validVersion = (value) => /^(all|v\d+\.\d+)$/.test(value ?? '');
+  const validVersion = (value) => /^v\d+\.\d+$/.test(value ?? '');
 
 	$: suiteParam = isBrowser ? $pageStore.url.searchParams.get('suite') : null;
 	$: platformParam = isBrowser ? $pageStore.url.searchParams.get('platform') : null;
@@ -31,7 +31,7 @@ hide_toc: true
 </script>
 
 The query plots show the warm-run mean used to calculate the suite geomean. Median and
-fastest–slowest timings are included in each point's tooltip as noise context. The release line dropdown picks which development line (v2.0, v2.1, ...) is plotted; 'All lines' overlays them in different colours. A point's `range` and `PRs` links always compare it with the previous benchmarked commit on the same line.
+fastest–slowest timings are included in each point's tooltip as noise context.
 
 ```sql suite_options
 select
@@ -71,8 +71,8 @@ where platform_id = '${inputs.platform_select.value}'
 ```
 
 ```sql version_options
--- The release lines (v2.0, v2.1, ...) that have plottable runs, newest first so the dropdown can
--- default to the line currently under development.
+-- The release lines (v2.0, v2.1, ...) that have plottable runs, oldest first. The button group
+-- defaults to the first: v2.0 is the line of interest for now, v2.1 only recently forked.
 select
   'v' || regexp_extract(duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) as version_line,
   regexp_extract(duckdb_version, '^v?([0-9]+)\.', 1)::int as major,
@@ -81,7 +81,7 @@ from benchmarks.geomean_runs
 where storage_type = 'duckdb'
   and merge_commit_date is not null
 group by all
-order by major desc, minor desc
+order by major, minor
 ```
 
 <div class="mb-6 flex flex-wrap items-end gap-x-3 rounded-lg border border-base-300 bg-base-100 p-4">
@@ -118,22 +118,19 @@ order by major desc, minor desc
         title="Platform"
         description="OS, CPU architecture and machine type"
     />
-    <span class="mb-4 whitespace-nowrap text-xs font-medium">
-      Memory: {selected_platform?.[0]?.memory_label ?? 'Unknown'}
+    <span class="mb-4">
+      <BenchmarkMemoryBadge memory={selected_platform?.[0]?.memory_label} />
     </span>
   </div>
 
-  <div class="min-w-[12rem]">
-    <Dropdown
+  <div>
+    <ButtonGroup
         name=version_select
         data={version_options}
         value=version_line
         defaultValue={initialVersion ?? version_options?.[0]?.version_line}
         title="Release line"
-        description="Lines are benchmarked side by side; 'All lines' overlays them in different colours"
-    >
-        <DropdownOption value="all" valueLabel="All lines" />
-    </Dropdown>
+    />
   </div>
 </div>
 
@@ -169,9 +166,8 @@ where r.storage_type = 'duckdb'
   and r.benchmark_series = '${inputs.suite_select.value}'
   and r.merge_commit_date >= '${inputs.date_select.start}'
   and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
-  -- release line filter: 'all' plots every line, otherwise only runs of the selected one
-  and ('${inputs.version_select.value}' = 'all'
-       or 'v' || regexp_extract(r.duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) = '${inputs.version_select.value}')
+  -- only runs of the selected release line
+  and 'v' || regexp_extract(r.duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) = '${inputs.version_select}'
 order by r.merge_commit_date, r.run_timestamp
 ```
 
@@ -239,9 +235,8 @@ where q.storage_type = 'duckdb'
   and q.benchmark_series = '${inputs.suite_select.value}'
   and q.merge_commit_date >= '${inputs.date_select.start}'
   and q.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
-  -- release line filter: 'all' plots every line, otherwise only runs of the selected one
-  and ('${inputs.version_select.value}' = 'all'
-       or 'v' || regexp_extract(q.duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) = '${inputs.version_select.value}')
+  -- only runs of the selected release line
+  and 'v' || regexp_extract(q.duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) = '${inputs.version_select}'
 order by q.query, q.merge_commit_date, q.run_timestamp
 ```
 
