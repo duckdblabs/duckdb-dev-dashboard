@@ -164,12 +164,17 @@ order by r.duckdb_version
 ```
 
 ```sql chart_bounds
-select max(y) * 1.08 as y_max
+-- Headroom above the chart's tallest element, keyed by suite because the chart looks its bound up
+-- that way. Without it the axis is fitted to the data alone and a baseline above it is clipped.
+select
+  benchmark_series,
+  max(y) * 1.08 as y_max
 from (
-  select geomean_seconds as y from ${geomean}
+  select benchmark_series, geomean_seconds  as y from ${geomean}
   union all
-  select baseline_seconds as y from ${version_baselines}
+  select benchmark_series, baseline_seconds as y from ${version_baselines}
 )
+group by benchmark_series
 ```
 
 ```sql query_history
