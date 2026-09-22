@@ -10,12 +10,14 @@
   export let platform;
   export let start;
   export let end;
+  export let version = undefined;
 
   $: params = new URLSearchParams({
     suite: series ?? '',
     platform: platform ?? '',
     start: start ?? '',
-    end: end ?? ''
+    end: end ?? '',
+    ...(version ? { version } : {})
   });
   $: href = addBasePath(`/benchmarks/${storage}/queries?${params.toString()}`);
 </script>

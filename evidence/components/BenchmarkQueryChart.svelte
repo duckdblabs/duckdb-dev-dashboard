@@ -12,7 +12,10 @@
     formatSeconds,
     fullTimestamp,
     previousCommitMap,
-    shortDate
+    shortDate,
+    versionLine,
+    versionLineColors,
+    versionLineOrder
   } from './benchmarkChartUtils.js';
 
   export let data = [];
@@ -47,14 +50,34 @@
       const previousCommitSha = previousCommitBySha.get(row.commit_sha);
       const mergedAt = escapeHtml(fullTimestamp(row.merge_commit_date));
       const querySet = escapeHtml(row.query_set ?? 'Unknown');
+      const version = escapeHtml(row.duckdb_version ?? 'Unknown');
 
       if (params.seriesName === 'failed') {
         const error = row.error ? `<br>error: ${escapeHtml(row.error)}` : '';
-        return `<strong>Merged ${mergedAt}</strong><br><span style="color:#ef4444;font-weight:600;">failed — excluded from geomean</span><br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}${error}`;
+        return `<strong>Merged ${mergedAt}</strong><br><span style="color:#ef4444;font-weight:600;">failed — excluded from geomean</span><br>version: ${version}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}${error}`;
       }
 
-      return `<strong>Merged ${mergedAt}</strong><br>mean (sec): ${formatSeconds(row.mean_seconds)}<br>median (sec): ${formatSeconds(row.median_seconds)}<br>range (sec): ${formatSeconds(row.fastest_seconds)}–${formatSeconds(row.slowest_seconds)}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}`;
+      return `<strong>Merged ${mergedAt}</strong><br>version: ${version}<br>mean (sec): ${formatSeconds(row.mean_seconds)}<br>median (sec): ${formatSeconds(row.median_seconds)}<br>range (sec): ${formatSeconds(row.fastest_seconds)}–${formatSeconds(row.slowest_seconds)}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}`;
     };
+
+    // One series per release line, so main and the maintenance branch are separate colours.
+    const lineOrder = versionLineOrder(successful.map((row) => versionLine(row.duckdb_version)));
+    const lineColors = versionLineColors(lineOrder);
+    const meanSeries = lineOrder.map((line) => ({
+      name: line,
+      type: 'line',
+      data: successful
+        .filter((row) => versionLine(row.duckdb_version) === line)
+        .map((row) => ({
+          value: [chartTime(row.merge_commit_date), Number(row.mean_seconds)],
+          row
+        })),
+      showSymbol: true,
+      symbol: 'circle',
+      symbolSize: 7,
+      lineStyle: { width: 0 },
+      itemStyle: { color: lineColors[line] }
+    }));
 
     const baselineSeries = baselineRows
       .filter((row) => Number.isFinite(Number(row.baseline_seconds)))
@@ -106,19 +129,7 @@
         axisLabel: { formatter: (value) => Number(value).toFixed(3) }
       },
       series: [
-        {
-          name: 'mean (sec)',
-          type: 'line',
-          data: successful.map((row) => ({
-            value: [chartTime(row.merge_commit_date), Number(row.mean_seconds)],
-            row
-          })),
-          showSymbol: true,
-          symbol: 'circle',
-          symbolSize: 7,
-          lineStyle: { width: 0 },
-          itemStyle: { color: '#2563eb' }
-        },
+        ...meanSeries,
         {
           name: 'failed',
           type: 'scatter',

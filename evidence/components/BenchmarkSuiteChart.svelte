@@ -8,10 +8,14 @@
   import {
     chartTime,
     commitLinks,
+    escapeHtml,
     formatSeconds,
     fullTimestamp,
     previousCommitMap,
-    shortDate
+    shortDate,
+    versionLine,
+    versionLineColors,
+    versionLineOrder
   } from './benchmarkChartUtils.js';
 
   export let data = [];
@@ -22,6 +26,7 @@
   export let platform = undefined;
   export let dateStart = undefined;
   export let dateEnd = undefined;
+  export let version = undefined;
 
   const chartOptions = (rows) => {
     const previousCommitBySha = previousCommitMap(rows);
@@ -53,14 +58,20 @@
           const previousCommitSha = previousCommitBySha.get(commitSha);
           const seconds = formatSeconds(geomean);
           const mergedAt = fullTimestamp(row?.merge_commit_date ?? timestamp);
+          const version = escapeHtml(row?.duckdb_version ?? point.seriesName ?? 'Unknown');
 
-          return `<strong>Merged ${mergedAt}</strong><br>geomean (sec): ${seconds}<br>commit: ${commitLinks(row, previousCommitSha)}`;
+          return `<strong>Merged ${mergedAt}</strong><br>version: ${version}<br>geomean (sec): ${seconds}<br>commit: ${commitLinks(row, previousCommitSha)}`;
         }
       }
     };
   };
 
-  $: rows = data?.filter?.((row) => row.benchmark_series === series) ?? [];
+  // One plotted series per release line, so main and the maintenance branch are separate colours.
+  $: rows = (data?.filter?.((row) => row.benchmark_series === series) ?? [])
+    .map((row) => ({ ...row, version_line: versionLine(row.duckdb_version) }));
+  $: lines = rows.map((row) => row.version_line);
+  $: lineOrder = versionLineOrder(lines);
+  $: lineColors = versionLineColors(lineOrder);
   $: baselineRows = baselines?.filter?.((row) => row.benchmark_series === series) ?? [];
   $: yMax = bounds?.find?.((row) => row.benchmark_series === series)?.y_max;
 </script>
@@ -72,6 +83,9 @@
       xType=time
       echartsOptions={chartOptions(rows)}
       y=geomean_seconds
+      series=version_line
+      seriesOrder={lineOrder}
+      seriesColors={lineColors}
       yFmt=num3
       {yMax}
       yAxisTitle="geomean (sec)"
@@ -106,6 +120,7 @@
         {platform}
         start={dateStart}
         end={dateEnd}
+        {version}
     />
   {/if}
 {/if}

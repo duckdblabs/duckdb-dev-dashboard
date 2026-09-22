@@ -46,6 +46,33 @@ where platform_id = '${inputs.platform_select.value}'
 />
 <span class="mt-4 text-xs font-medium">Memory: {selected_platform?.[0]?.memory_label ?? 'Unknown'}</span>
 
+```sql version_options
+-- The release lines (v2.0, v2.1, ...) that have plottable runs, newest first so the dropdown can
+-- default to the line currently under development.
+select
+  'v' || regexp_extract(duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) as version_line,
+  regexp_extract(duckdb_version, '^v?([0-9]+)\.', 1)::int as major,
+  regexp_extract(duckdb_version, '^v?[0-9]+\.([0-9]+)', 1)::int as minor
+from benchmarks.geomean_runs
+where storage_type = 'duckdb'
+  and merge_commit_date is not null
+group by all
+order by major desc, minor desc
+```
+
+<Dropdown
+    name=version_select
+    data={version_options}
+    value=version_line
+    defaultValue={version_options?.[0]?.version_line}
+    title="Release line"
+    description="Lines are benchmarked side by side; 'All lines' overlays them in different colours"
+>
+    <DropdownOption value="all" valueLabel="All lines" />
+</Dropdown>
+
+
+The release line dropdown picks which development line (v2.0, v2.1, ...) is plotted; 'All lines' overlays them in different colours. A point's `range` and `PRs` links always compare it with the previous benchmarked commit on the same line.
 
 <!-- dataLoaded: without it the warning flashes while the query is still running -->
 {#if geomean.dataLoaded && geomean.length === 0}
@@ -94,6 +121,9 @@ where r.storage_type = 'duckdb'
   -- commits merged on the window's last day.
   and r.merge_commit_date >= '${inputs.date_select.start}'
   and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+  -- release line filter: 'all' plots every line, otherwise only runs of the selected one
+  and ('${inputs.version_select.value}' = 'all'
+       or 'v' || regexp_extract(r.duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) = '${inputs.version_select.value}')
 order by r.merge_commit_date, r.run_timestamp
 ```
 
@@ -155,6 +185,7 @@ group by benchmark_series
     series="tpcds @ sf100"
     storage="duckdb"
     platform={inputs.platform_select.value}
+    version={inputs.version_select.value}
     dateStart={inputs.date_select.start}
     dateEnd={inputs.date_select.end}
 />
@@ -168,6 +199,7 @@ group by benchmark_series
     series="tpch @ sf100"
     storage="duckdb"
     platform={inputs.platform_select.value}
+    version={inputs.version_select.value}
     dateStart={inputs.date_select.start}
     dateEnd={inputs.date_select.end}
 />
@@ -181,6 +213,7 @@ group by benchmark_series
     series="clickbench"
     storage="duckdb"
     platform={inputs.platform_select.value}
+    version={inputs.version_select.value}
     dateStart={inputs.date_select.start}
     dateEnd={inputs.date_select.end}
 />
@@ -212,6 +245,9 @@ where r.storage_type = 'duckdb'
   -- same date filter as the geomean query above - see there for the two-day end bound
   and r.merge_commit_date >= '${inputs.date_select.start}'
   and r.merge_commit_date <  '${inputs.date_select.end}'::date + interval 2 day
+  -- release line filter: 'all' plots every line, otherwise only runs of the selected one
+  and ('${inputs.version_select.value}' = 'all'
+       or 'v' || regexp_extract(r.duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) = '${inputs.version_select.value}')
 order by r.run_timestamp desc
 ```
 
