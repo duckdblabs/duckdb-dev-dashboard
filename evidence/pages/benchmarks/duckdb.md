@@ -80,6 +80,7 @@ No runs match this platform and date range.
 
 ```sql geomean
 select
+  r.run_id,
   r.benchmark_series,
   r.benchmark,
   r.scale_factor_label,
@@ -156,20 +157,16 @@ group by r.benchmark_series, r.duckdb_version
 order by r.benchmark_series, r.duckdb_version
 ```
 
-```sql chart_bounds
--- A little headroom above each chart's tallest element.
---
--- Needed because a reference line exactly at the chart maximum is drawn on the plot border and is
--- indistinguishable from it.
+```sql run_failures
+-- Which queries failed in each plotted run, listed in the tooltip of an incomplete point.
 select
-  benchmark_series,
-  max(y) * 1.08 as y_max
-from (
-  select benchmark_series, geomean_seconds  as y from ${geomean}
-  union all
-  select benchmark_series, baseline_seconds as y from ${version_baselines}
-)
-group by benchmark_series
+  q.run_id,
+  string_agg(q.query, ', ' order by q.query) as failed_queries
+from benchmarks.query_times q
+where q.storage_type = 'duckdb'
+  and q.run_id in (select run_id from ${geomean})
+  and q.status <> 'ok'
+group by q.run_id
 ```
 
 ## TPC-DS @ sf100
@@ -177,7 +174,7 @@ group by benchmark_series
 <BenchmarkSuiteChart
     data={geomean}
     baselines={version_baselines}
-    bounds={chart_bounds}
+    failures={run_failures}
     series="tpcds @ sf100"
     storage="duckdb"
     platform={inputs.platform_select.value}
@@ -191,7 +188,7 @@ group by benchmark_series
 <BenchmarkSuiteChart
     data={geomean}
     baselines={version_baselines}
-    bounds={chart_bounds}
+    failures={run_failures}
     series="tpch @ sf100"
     storage="duckdb"
     platform={inputs.platform_select.value}
@@ -205,7 +202,7 @@ group by benchmark_series
 <BenchmarkSuiteChart
     data={geomean}
     baselines={version_baselines}
-    bounds={chart_bounds}
+    failures={run_failures}
     series="clickbench"
     storage="duckdb"
     platform={inputs.platform_select.value}
