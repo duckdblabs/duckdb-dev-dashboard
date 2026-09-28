@@ -23,6 +23,7 @@
   export let query;
   export let dateStart;
   export let dateEnd;
+  export let comparison = null;
 
   const dateBound = (value, extraDays = 0) => {
     const date = chartDate(value);
@@ -154,14 +155,27 @@
   $: baselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
   $: config = chartConfig(rows, baselineRows);
   $: failedCount = rows.filter((row) => row.status !== 'ok' || !Number.isFinite(Number(row.mean_seconds))).length;
+  $: comparisonTitle = comparison?.kind === 'release_slower'
+    ? `Latest 5-point median: ${formatSeconds(comparison.recentMedian)} sec; ${comparison.releaseVersion} annotation: ${formatSeconds(comparison.baselineMedian)} sec`
+    : `Latest 3-point median: ${formatSeconds(comparison?.recentMedian)} sec; preceding 5-point median: ${formatSeconds(comparison?.baselineMedian)} sec`;
 </script>
 
 <section id={`query-${query}`} class="min-h-[300px] rounded-md border border-base-300 bg-base-100 p-3">
   <div class="flex items-baseline justify-between gap-2">
     <h3 class="m-0 text-sm font-semibold">{query}</h3>
-    {#if failedCount > 0}
-      <span class="text-xs font-medium text-negative">× {failedCount} failed</span>
-    {/if}
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      {#if comparison?.isSlower}
+        <span
+            class="rounded border border-negative/50 bg-negative/10 px-1.5 py-0.5 text-xs font-medium text-negative"
+            title={comparisonTitle}
+        >
+          +{comparison.percentChange.toFixed(1)}% slower
+        </span>
+      {/if}
+      {#if failedCount > 0}
+        <span class="text-xs font-medium text-negative">× {failedCount} failed</span>
+      {/if}
+    </div>
   </div>
   <ECharts {config} data={rows} height="250px" />
 </section>

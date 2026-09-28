@@ -6,6 +6,7 @@
     "build:strict": "evidence build:strict",
     "dev": "evidence dev --open /",
     "test": "evidence build",
+    "test:unit": "node --test components/*.test.js",
     "sources": "evidence sources",
     "sources:strict": "evidence sources --strict",
     "preview": "evidence preview"
