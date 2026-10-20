@@ -79,14 +79,44 @@ export const versionLine = (version) => {
   return match ? `v${match[1]}` : 'unknown';
 };
 
+const stableVersionParts = (version) => {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(version ?? ''));
+  return match
+    ? { version: String(version), major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) }
+    : null;
+};
+
+export const latestReleaseVersions = (versions, lineCount = 2) => {
+  const newestByLine = new Map();
+  for (const version of versions ?? []) {
+    const candidate = stableVersionParts(version);
+    if (!candidate) continue;
+    const line = `${candidate.major}.${candidate.minor}`;
+    const current = newestByLine.get(line);
+    if (!current || candidate.patch > current.patch) newestByLine.set(line, candidate);
+  }
+
+  return [...newestByLine.values()]
+    .sort((left, right) => right.major - left.major || right.minor - left.minor)
+    .slice(0, Math.max(0, lineCount))
+    .map(({ version }) => version);
+};
+
 // Colours per release line. Fixed rather than palette-assigned so a line keeps its colour whichever
 // lines happen to be in the selected window; unlisted lines fall back to the spare colours in order.
 const VERSION_LINE_COLORS = { 'v2.0': '#2563eb', 'v2.1': '#7c3aed' };
 const SPARE_LINE_COLORS = ['#db2777', '#ca8a04', '#64748b'];
 
-// Fixed release references use the same colours in suite and per-query charts.
-const BASELINE_COLORS = { 'v1.4.5': '#ea580c', 'v1.5.5': '#0d9488', 'v2.0.0': '#db2777' };
-export const baselineColor = (version) => BASELINE_COLORS[version] ?? '#64748b';
+// Baselines are coloured by release line so a patch release retains its predecessor's colour.
+const BASELINE_LINE_COLORS = { 'v1.4': '#ea580c', 'v1.5': '#0d9488', 'v2.0': '#db2777' };
+const SPARE_BASELINE_COLORS = ['#64748b', '#ca8a04', '#9333ea', '#0891b2', '#65a30d'];
+export const baselineColor = (version) => {
+  const line = versionLine(version);
+  const match = /^v(\d+)\.(\d+)$/.exec(line);
+  if (!match) return SPARE_BASELINE_COLORS[0];
+  const index = (Number(match[1]) * 3 + Number(match[2])) % SPARE_BASELINE_COLORS.length;
+  return BASELINE_LINE_COLORS[line] ?? SPARE_BASELINE_COLORS[index];
+};
 
 export const versionLineColors = (lines) => {
   let spare = 0;

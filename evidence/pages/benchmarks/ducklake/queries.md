@@ -176,7 +176,7 @@ select
   arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
 from benchmarks.geomean_runs r
 where r.storage_type = 'ducklake'
-  and r.duckdb_version in ('v1.4.5', 'v1.5.5', 'v2.0.0')
+  and regexp_full_match(r.duckdb_version, 'v?[0-9]+\.[0-9]+\.[0-9]+')
   and exists (
     select 1
     from ${geomean} g
@@ -249,7 +249,7 @@ join ${platform_options} p
  and p.os is not distinct from q.os
 where q.storage_type = 'ducklake'
   and q.benchmark_series = '${inputs.suite_select.value}'
-  and q.duckdb_version in ('v1.4.5', 'v1.5.5', 'v2.0.0')
+  and regexp_full_match(q.duckdb_version, 'v?[0-9]+\.[0-9]+\.[0-9]+')
   and q.status = 'ok'
   and q.mean_seconds is not null
   and exists (

@@ -15,6 +15,7 @@
     formatSeconds,
     formatTimingTick,
     fullTimestamp,
+    latestReleaseVersions,
     niceAxisMax,
     previousCommitMap,
     shortDate,
@@ -168,7 +169,9 @@
   };
 
   $: rows = data?.filter?.((row) => row.benchmark_series === series) ?? [];
-  $: baselineRows = baselines?.filter?.((row) => row.benchmark_series === series) ?? [];
+  $: availableBaselineRows = baselines?.filter?.((row) => row.benchmark_series === series) ?? [];
+  $: baselineVersions = latestReleaseVersions(availableBaselineRows.map((row) => row.duckdb_version));
+  $: baselineRows = availableBaselineRows.filter((row) => baselineVersions.includes(row.duckdb_version));
   $: runIds = new Set(rows.map((row) => row.run_id));
   $: failedByRun = new Map(
     (failures ?? []).filter((row) => runIds.has(row.run_id)).map((row) => [row.run_id, row.failed_queries])

@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  baselineColor,
   dateAxisInterval,
   formatTimingTick,
+  latestReleaseVersions,
   niceAxisMax,
   timingUnit
 } from './benchmarkChartUtils.js';
@@ -42,4 +44,31 @@ test('axis maxima are rounded up to readable boundaries', () => {
   assert.equal(niceAxisMax(0.19948), 0.2);
   assert.equal(niceAxisMax(0.55862), 0.6);
   assert.equal(niceAxisMax(1.08), 1.2);
+});
+
+test('release baselines use the newest patch from the two newest minor lines', () => {
+  assert.deepEqual(
+    latestReleaseVersions(['v1.4.5', 'v1.5.5', 'v2.0.0']),
+    ['v2.0.0', 'v1.5.5']
+  );
+  assert.deepEqual(
+    latestReleaseVersions(['v1.4.5', 'v1.5.5', 'v2.0.0', 'v2.0.1']),
+    ['v2.0.1', 'v1.5.5']
+  );
+  assert.deepEqual(
+    latestReleaseVersions(['v1.5.5', 'v2.0.0', 'v2.0.1', 'v2.1.0']),
+    ['v2.1.0', 'v2.0.1']
+  );
+});
+
+test('release baseline selection uses numeric versions and excludes prereleases', () => {
+  assert.deepEqual(
+    latestReleaseVersions(['v1.9.9', 'v1.10.0', 'v2.0.0-alpha1', 'development', 'v2.0']),
+    ['v1.10.0', 'v1.9.9']
+  );
+});
+
+test('patch releases keep the colour of their minor release line', () => {
+  assert.equal(baselineColor('v2.0.1'), baselineColor('v2.0.0'));
+  assert.notEqual(baselineColor('v2.1.0'), baselineColor('v2.0.1'));
 });

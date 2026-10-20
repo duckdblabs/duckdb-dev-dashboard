@@ -14,6 +14,7 @@
     formatSeconds,
     formatTimingTick,
     fullTimestamp,
+    latestReleaseVersions,
     niceAxisMax,
     previousCommitMap,
     shortDate,
@@ -168,7 +169,9 @@
   };
 
   $: rows = data?.filter?.((row) => row.query === query) ?? [];
-  $: baselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
+  $: availableBaselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
+  $: baselineVersions = latestReleaseVersions(availableBaselineRows.map((row) => row.duckdb_version));
+  $: baselineRows = availableBaselineRows.filter((row) => baselineVersions.includes(row.duckdb_version));
   $: config = chartConfig(rows, baselineRows);
   $: failureSummary = queryFailureSummary(rows);
   $: comparisonTitle = comparison?.kind === 'release_slower'
