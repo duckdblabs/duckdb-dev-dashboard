@@ -9,10 +9,13 @@
     chartDate,
     chartTime,
     commitLinks,
+    dateAxisInterval,
     escapeHtml,
     formatSeconds,
     formatTimingTick,
     fullTimestamp,
+    latestReleaseVersions,
+    niceAxisMax,
     previousCommitMap,
     shortDate,
     timingUnit,
@@ -45,7 +48,7 @@
       ...baselineRows.map((row) => Number(row.baseline_seconds)).filter(Number.isFinite)
     ];
     const yUnit = timingUnit(values);
-    const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
+    const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const xMin = dateBound(dateStart) ?? Math.min(...rows.map((row) => chartTime(row.merge_commit_date)));
     // Match the dashboard's inclusive end-date workaround: the page query uses end + 2 days.
     const xMax = dateBound(dateEnd, 2) ?? Math.max(...rows.map((row) => chartTime(row.merge_commit_date)));
@@ -108,7 +111,7 @@
 
     return {
       animation: false,
-      grid: { left: 58, right: 52, top: 12, bottom: 60 },
+      grid: { left: 40, right: 52, top: 12, bottom: 8 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
@@ -119,16 +122,22 @@
         formatter: tooltip
       },
       xAxis: {
-        type: 'time',
+        type: 'value',
         min: xMin,
         max: xMax,
-        splitNumber: 4,
+        splitNumber: 10,
+        interval: dateAxisInterval(xMin, xMax),
         minInterval: 24 * 60 * 60 * 1000,
+        splitLine: { show: false },
         axisLabel: {
           formatter: shortDate,
           rotate: 45,
-          margin: 12,
-          hideOverlap: true
+          margin: 8,
+          hideOverlap: true,
+          showMinLabel: false,
+          showMaxLabel: false,
+          align: 'right',
+          verticalAlign: 'middle'
         }
       },
       yAxis: {
@@ -137,7 +146,7 @@
         max: yMax,
         name: `mean (${yUnit.label})`,
         nameLocation: 'middle',
-        nameGap: 43,
+        nameGap: 33,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
       series: [
@@ -160,7 +169,9 @@
   };
 
   $: rows = data?.filter?.((row) => row.query === query) ?? [];
-  $: baselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
+  $: availableBaselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
+  $: baselineVersions = latestReleaseVersions(availableBaselineRows.map((row) => row.duckdb_version));
+  $: baselineRows = availableBaselineRows.filter((row) => baselineVersions.includes(row.duckdb_version));
   $: config = chartConfig(rows, baselineRows);
   $: failureSummary = queryFailureSummary(rows);
   $: comparisonTitle = comparison?.kind === 'release_slower'

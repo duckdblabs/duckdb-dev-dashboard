@@ -126,11 +126,8 @@ order by r.merge_commit_date, r.run_timestamp
 ```
 
 ```sql version_baselines
--- One baseline per pinned duckdb version per chart, drawn as a reference line.
---
--- Pinned deliberately rather than derived: these are the releases currently worth comparing
--- against, and a new release should not start drawing a line until someone decides it should.
--- Add to this list to add a reference line.
+-- One baseline per stable duckdb version per chart. The chart keeps the newest patch from each
+-- of the two newest minor release lines.
 --
 -- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
 -- narrowing the window should not make it vanish. The releases were measured well before most of
@@ -142,7 +139,7 @@ select
   arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
 from benchmarks.geomean_runs r
 where r.storage_type = 'ducklake'
-  and r.duckdb_version in ('v1.4.5', 'v1.5.5', 'v2.0.0')
+  and regexp_full_match(r.duckdb_version, 'v?[0-9]+\.[0-9]+\.[0-9]+')
   -- the geomean query already carries the platform filter and identifies each benchmark series,
   -- so matching a row of it applies both here too
   and exists (

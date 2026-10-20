@@ -10,10 +10,13 @@
     chartDate,
     chartTime,
     commitLinks,
+    dateAxisInterval,
     escapeHtml,
     formatSeconds,
     formatTimingTick,
     fullTimestamp,
+    latestReleaseVersions,
+    niceAxisMax,
     previousCommitMap,
     shortDate,
     timingUnit,
@@ -52,8 +55,9 @@
     ].filter(Number.isFinite);
     const yUnit = timingUnit(values);
     // headroom above the tallest element: a reference line exactly at the chart maximum sits on
-    // the plot border and is indistinguishable from it
-    const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
+    // the plot border and is indistinguishable from it. Round the result so the top tick remains
+    // as readable as the regular interval ticks below it.
+    const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const times = rows.map((row) => chartTime(row.merge_commit_date));
     const xMin = dateBound(dateStart) ?? Math.min(...times);
     // the page query's end bound is end + 2 days; see the geomean query for why
@@ -120,7 +124,7 @@
 
     return {
       animation: false,
-      grid: { left: 64, right: 56, top: 16, bottom: 64 },
+      grid: { left: 44, right: 56, top: 16, bottom: 8 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
@@ -133,16 +137,22 @@
         formatter: tooltip
       },
       xAxis: {
-        type: 'time',
+        type: 'value',
         min: xMin,
         max: xMax,
-        splitNumber: 6,
+        splitNumber: 10,
+        interval: dateAxisInterval(xMin, xMax),
         minInterval: 24 * 60 * 60 * 1000,
+        splitLine: { show: false },
         axisLabel: {
           formatter: shortDate,
           rotate: 45,
-          margin: 14,
-          hideOverlap: true
+          margin: 8,
+          hideOverlap: true,
+          showMinLabel: false,
+          showMaxLabel: false,
+          align: 'right',
+          verticalAlign: 'middle'
         }
       },
       yAxis: {
@@ -151,7 +161,7 @@
         max: yMax,
         name: `geomean (${yUnit.label})`,
         nameLocation: 'middle',
-        nameGap: 48,
+        nameGap: 36,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
       series: [...runSeries, ...baselineSeries]
@@ -159,7 +169,9 @@
   };
 
   $: rows = data?.filter?.((row) => row.benchmark_series === series) ?? [];
-  $: baselineRows = baselines?.filter?.((row) => row.benchmark_series === series) ?? [];
+  $: availableBaselineRows = baselines?.filter?.((row) => row.benchmark_series === series) ?? [];
+  $: baselineVersions = latestReleaseVersions(availableBaselineRows.map((row) => row.duckdb_version));
+  $: baselineRows = availableBaselineRows.filter((row) => baselineVersions.includes(row.duckdb_version));
   $: runIds = new Set(rows.map((row) => row.run_id));
   $: failedByRun = new Map(
     (failures ?? []).filter((row) => runIds.has(row.run_id)).map((row) => [row.run_id, row.failed_queries])
