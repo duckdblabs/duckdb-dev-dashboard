@@ -11,9 +11,11 @@
     commitLinks,
     escapeHtml,
     formatSeconds,
+    formatTimingTick,
     fullTimestamp,
     previousCommitMap,
     shortDate,
+    timingUnit,
     versionLine,
     versionLineColors,
     versionLineOrder
@@ -42,6 +44,7 @@
       ...successful.map((row) => Number(row.mean_seconds)),
       ...baselineRows.map((row) => Number(row.baseline_seconds)).filter(Number.isFinite)
     ];
+    const yUnit = timingUnit(values);
     const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
     const xMin = dateBound(dateStart) ?? Math.min(...rows.map((row) => chartTime(row.merge_commit_date)));
     // Match the dashboard's inclusive end-date workaround: the page query uses end + 2 days.
@@ -105,7 +108,7 @@
 
     return {
       animation: false,
-      grid: { left: 58, right: 52, top: 12, bottom: 42 },
+      grid: { left: 58, right: 52, top: 12, bottom: 60 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
@@ -121,16 +124,21 @@
         max: xMax,
         splitNumber: 4,
         minInterval: 24 * 60 * 60 * 1000,
-        axisLabel: { formatter: shortDate }
+        axisLabel: {
+          formatter: shortDate,
+          rotate: 45,
+          margin: 12,
+          hideOverlap: true
+        }
       },
       yAxis: {
         type: 'value',
         min: 0,
         max: yMax,
-        name: 'mean (sec)',
+        name: `mean (${yUnit.label})`,
         nameLocation: 'middle',
         nameGap: 43,
-        axisLabel: { formatter: (value) => Number(value).toFixed(3) }
+        axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
       series: [
         ...meanSeries,
