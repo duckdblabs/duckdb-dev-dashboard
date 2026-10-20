@@ -13,6 +13,7 @@
     formatSeconds,
     formatTimingTick,
     fullTimestamp,
+    niceAxisMax,
     previousCommitMap,
     shortDate,
     timingUnit,
@@ -45,7 +46,7 @@
       ...baselineRows.map((row) => Number(row.baseline_seconds)).filter(Number.isFinite)
     ];
     const yUnit = timingUnit(values);
-    const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
+    const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const xMin = dateBound(dateStart) ?? Math.min(...rows.map((row) => chartTime(row.merge_commit_date)));
     // Match the dashboard's inclusive end-date workaround: the page query uses end + 2 days.
     const xMax = dateBound(dateEnd, 2) ?? Math.max(...rows.map((row) => chartTime(row.merge_commit_date)));

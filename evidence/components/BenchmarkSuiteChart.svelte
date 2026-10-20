@@ -14,6 +14,7 @@
     formatSeconds,
     formatTimingTick,
     fullTimestamp,
+    niceAxisMax,
     previousCommitMap,
     shortDate,
     timingUnit,
@@ -52,8 +53,9 @@
     ].filter(Number.isFinite);
     const yUnit = timingUnit(values);
     // headroom above the tallest element: a reference line exactly at the chart maximum sits on
-    // the plot border and is indistinguishable from it
-    const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
+    // the plot border and is indistinguishable from it. Round the result so the top tick remains
+    // as readable as the regular interval ticks below it.
+    const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const times = rows.map((row) => chartTime(row.merge_commit_date));
     const xMin = dateBound(dateStart) ?? Math.min(...times);
     // the page query's end bound is end + 2 days; see the geomean query for why

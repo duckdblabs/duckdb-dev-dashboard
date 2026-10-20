@@ -32,6 +32,18 @@ export const formatTimingTick = (value, unit) => {
     : String(value);
 };
 
+const NICE_AXIS_FRACTIONS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+
+export const niceAxisMax = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return 1;
+
+  const magnitude = 10 ** Math.floor(Math.log10(numericValue));
+  const normalized = numericValue / magnitude;
+  const fraction = NICE_AXIS_FRACTIONS.find((candidate) => candidate >= normalized) ?? 10;
+  return Number((fraction * magnitude).toPrecision(12));
+};
+
 const twoDigits = (value) => String(value).padStart(2, '0');
 
 export const fullTimestamp = (value) => {
