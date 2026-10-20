@@ -142,6 +142,7 @@
         splitNumber: 10,
         interval: dateAxisInterval(xMin, xMax),
         minInterval: 24 * 60 * 60 * 1000,
+        splitLine: { show: false },
         axisLabel: {
           formatter: shortDate,
           rotate: 45,
