@@ -128,3 +128,13 @@ test('latest annotation is selected by semantic version', () => {
   assert.equal(version, 'v1.10.1');
   assert.equal(latestAnnotationVersion([]), null);
 });
+
+test('release comparison switches to 2.0.0 when available and falls back when absent', () => {
+  const older = [{ duckdb_version: 'v1.4.5' }, { duckdb_version: 'v1.5.5' }];
+  const version = latestAnnotationVersion([...older, { duckdb_version: 'v2.0.0' }]);
+  const result = scoreReleaseSlower(rows([1.2, 1.2, 1.2, 1.2, 1.2]), 1, version);
+
+  assert.equal(result.releaseVersion, 'v2.0.0');
+  assert.equal(result.isSlower, true);
+  assert.equal(latestAnnotationVersion(older), 'v1.5.5');
+});

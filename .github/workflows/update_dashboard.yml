@@ -66,6 +66,10 @@ jobs:
       - name: Install dependencies
         working-directory: ./evidence
         run: npm install
+      - name: Unit tests
+        run: |
+          .venv/bin/python3 -m unittest discover -s tests
+          npm --prefix evidence run test:unit
       - name: build
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'

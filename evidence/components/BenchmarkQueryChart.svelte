@@ -5,6 +5,7 @@
 <script>
   import { ECharts } from '@evidence-dev/core-components';
   import {
+    baselineColor,
     chartDate,
     chartTime,
     commitLinks,
@@ -91,12 +92,12 @@
         lineStyle: {
           type: 'dashed',
           width: 1,
-          color: row.duckdb_version === 'v1.4.5' ? '#ea580c' : '#0d9488'
+          color: baselineColor(row.duckdb_version)
         },
         endLabel: {
           show: true,
           formatter: row.duckdb_version,
-          color: row.duckdb_version === 'v1.4.5' ? '#ea580c' : '#0d9488',
+          color: baselineColor(row.duckdb_version),
           fontSize: 10
         }
       }));

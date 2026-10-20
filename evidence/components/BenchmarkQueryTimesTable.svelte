@@ -11,8 +11,19 @@
 <DataTable {data} rows=20 search=true>
     <Column id=query />
     <Column id='median (s)' />
+    <Column id='v2.0.0 (s)' />
     <Column id='v1.5.5 (s)' />
     <Column id='v1.4.5 (s)' />
+    <Column
+        id='ratio vs v2.0.0'
+        fmt=num2
+        contentType=colorscale
+        scaleColumn='v2.0.0 color'
+        colorScale={[['#dcfce7', '#14532d'], ['#fee2e2', '#7f1d1d']]}
+        colorBreakpoints={[-1, 1]}
+        colorMin={-1}
+        colorMax={1}
+    />
     <Column
         id='ratio vs v1.5.5'
         fmt=num2

@@ -45,6 +45,10 @@ export const versionLine = (version) => {
 const VERSION_LINE_COLORS = { 'v2.0': '#2563eb', 'v2.1': '#7c3aed' };
 const SPARE_LINE_COLORS = ['#db2777', '#ca8a04', '#64748b'];
 
+// Fixed release references use the same colours in suite and per-query charts.
+const BASELINE_COLORS = { 'v1.4.5': '#ea580c', 'v1.5.5': '#0d9488', 'v2.0.0': '#db2777' };
+export const baselineColor = (version) => BASELINE_COLORS[version] ?? '#64748b';
+
 export const versionLineColors = (lines) => {
   let spare = 0;
   return Object.fromEntries(

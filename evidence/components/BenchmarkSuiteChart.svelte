@@ -6,6 +6,7 @@
   import { ECharts } from '@evidence-dev/core-components';
   import BenchmarkQueryLink from './BenchmarkQueryLink.svelte';
   import {
+    baselineColor,
     chartDate,
     chartTime,
     commitLinks,
@@ -28,8 +29,6 @@
   export let dateStart = undefined;
   export let dateEnd = undefined;
   export let version = undefined;
-
-  const BASELINE_COLORS = { 'v1.4.5': '#ea580c', 'v1.5.5': '#0d9488' };
 
   const dateBound = (value, extraDays = 0) => {
     const date = chartDate(value);
@@ -107,11 +106,11 @@
         data: [[xMin, Number(row.baseline_seconds)], [xMax, Number(row.baseline_seconds)]],
         showSymbol: false,
         silent: true,
-        lineStyle: { type: 'dashed', width: 1, color: BASELINE_COLORS[row.duckdb_version] ?? '#64748b' },
+        lineStyle: { type: 'dashed', width: 1, color: baselineColor(row.duckdb_version) },
         endLabel: {
           show: true,
           formatter: row.duckdb_version,
-          color: BASELINE_COLORS[row.duckdb_version] ?? '#64748b',
+          color: baselineColor(row.duckdb_version),
           fontSize: 10
         }
       }));
