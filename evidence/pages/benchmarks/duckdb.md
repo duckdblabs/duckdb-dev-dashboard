@@ -127,7 +127,7 @@ order by r.merge_commit_date, r.run_timestamp
 ```sql version_baselines
 -- One baseline per pinned duckdb version per chart, drawn as a reference line.
 --
--- Pinned deliberately rather than derived: these are the two releases currently worth comparing
+-- Pinned deliberately rather than derived: these are the releases currently worth comparing
 -- against, and a new release should not start drawing a line until someone decides it should.
 -- Add to this list to add a reference line.
 --
@@ -141,7 +141,7 @@ select
   arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
 from benchmarks.geomean_runs r
 where r.storage_type = 'duckdb'
-  and r.duckdb_version in ('v1.4.5', 'v1.5.5')
+  and r.duckdb_version in ('v1.4.5', 'v1.5.5', 'v2.0.0')
   -- the geomean query already carries the platform filter and identifies each benchmark series,
   -- so matching a row of it applies both here too
   and exists (
@@ -213,15 +213,16 @@ group by q.run_id
 
 ## Per-query execution times
 
-The individual queries of a single run, each against the two release baselines on the selected
+The individual queries of a single run, each against the release baselines on the selected
 platform. Every timing of the release baselines is a median over that query's warm runs.
 
 `ratio vs ...` is the selected run divided by the baseline: **above 1.0 means the selected run is
 slower** than that release, below 1.0 means faster. A ratio above 1.1 is shaded red and one below
 0.9 green; the band in between is left uncoloured. Rows are sorted by the
-v1.5.5 ratio, so regressions are at the top and improvements at the bottom. A blank baseline means
-that release has no run of this query - v1.4.5 has no DuckLake runs at all. Failed queries are
-listed with empty timings.
+v2.0.0 ratio, falling back to v1.5.5 then v1.4.5 when a newer baseline is unavailable, so
+regressions are at the top and improvements at the bottom. A blank baseline means that release
+has no run of this query on the selected platform and storage backend. Failed queries are listed
+with empty timings.
 
 ```sql run_options
 select
@@ -254,7 +255,7 @@ order by r.run_timestamp desc
 />
 
 ```sql query_times
--- The selected run's queries, each next to the v1.5.5 and v1.4.5 medians for the same query.
+-- The selected run's queries, each next to the v2.0.0, v1.5.5 and v1.4.5 medians for the same query.
 --
 -- Baselines are joined on (benchmark_series, query), not query alone: tpch and tpcds both have a
 -- q01, and matching on the query name by itself would compare unrelated queries.
@@ -279,12 +280,13 @@ baselines as (
    and p.cpu_arch_label = q.cpu_arch_label
    and p.os is not distinct from q.os
   where q.storage_type = 'duckdb'
-    and q.duckdb_version in ('v1.4.5', 'v1.5.5')
+    and q.duckdb_version in ('v1.4.5', 'v1.5.5', 'v2.0.0')
   group by q.benchmark_series, q.query, q.duckdb_version
 )
 select
   s.query,
   round(s.median_seconds, 4)                        as 'median (s)',
+  round(b20.baseline_seconds, 4)                    as 'v2.0.0 (s)',
   round(b55.baseline_seconds, 4)                    as 'v1.5.5 (s)',
   round(b45.baseline_seconds, 4)                    as 'v1.4.5 (s)',
   -- Rounded to the 2 decimals the table actually displays, not to 3.
@@ -292,9 +294,10 @@ select
   -- The flags below compare against this same rounded value, so the colour can never disagree
   -- with the number in the cell. At 3 decimals it did: 1.101 and 1.100 both print as "1.10" but
   -- only the first is > 1.1, so one 1.10 came out red and the next did not.
+  round(s.median_seconds / nullif(b20.baseline_seconds, 0), 2) as 'ratio vs v2.0.0',
   round(s.median_seconds / nullif(b55.baseline_seconds, 0), 2) as 'ratio vs v1.5.5',
   round(s.median_seconds / nullif(b45.baseline_seconds, 0), 2) as 'ratio vs v1.4.5',
-  -- Colour flags for the two ratio columns, not shown in the table themselves: -1 paints the
+  -- Colour flags for the ratio columns, not shown in the table themselves: -1 paints the
   -- cell green, 1 paints it red, NULL leaves it with the plain cell background.
   --
   -- NULL deliberately covers two different cases at once - a ratio inside the neutral 0.9-1.1
@@ -304,6 +307,7 @@ select
   -- Flags rather than colouring on the ratio itself because a colorscale interpolates: scaling on
   -- the raw ratio would tint everything between 0.9 and 1.1 some shade of pink or green instead
   -- of leaving it alone.
+  case when "ratio vs v2.0.0" > 1.1 then 1 when "ratio vs v2.0.0" < 0.9 then -1 end as 'v2.0.0 color',
   case when "ratio vs v1.5.5" > 1.1 then 1 when "ratio vs v1.5.5" < 0.9 then -1 end as 'v1.5.5 color',
   case when "ratio vs v1.4.5" > 1.1 then 1 when "ratio vs v1.4.5" < 0.9 then -1 end as 'v1.4.5 color',
   s.timed_runs                                      as '# warm runs',
@@ -311,6 +315,10 @@ select
 from selected s
 -- left joins: a release with no run of this query leaves the baseline and its ratio blank
 -- rather than dropping the query from the table
+left join baselines b20
+  on  b20.benchmark_series = s.benchmark_series
+  and b20.query            = s.query
+  and b20.duckdb_version   = 'v2.0.0'
 left join baselines b55
   on  b55.benchmark_series = s.benchmark_series
   and b55.query            = s.query
@@ -320,14 +328,14 @@ left join baselines b45
   and b45.query            = s.query
   and b45.duckdb_version   = 'v1.4.5'
 -- regressions first: biggest ratio at the top, improvements at the bottom. Ordered on
--- the v1.5.5 ratio (the newer release) and falling back to v1.4.5 where v1.5.5 has no run of the
--- query; a query with neither baseline sorts last rather than to the top as a NULL.
-order by coalesce("ratio vs v1.5.5", "ratio vs v1.4.5") desc nulls last,
+-- the newest available release ratio; a query with no baseline sorts last rather than to the
+-- top as a NULL.
+order by coalesce("ratio vs v2.0.0", "ratio vs v1.5.5", "ratio vs v1.4.5") desc nulls last,
          s.median_seconds desc
 ```
 
 <!--
-  The two ratio columns are coloured off their companion `... color` flag column rather than off
+  The ratio columns are coloured off their companion `... color` flag column rather than off
   their own value - see the query above for why.
 
   Each colorScale entry is a `[light appearance, dark appearance]` pair, so the tints follow the

@@ -62,6 +62,16 @@ USE bench;
 SELECT benchmark, benchmark_name, scale_factor, count(*) FROM runs WHERE NOT is_test GROUP BY ALL;
 ```
 
+The benchmark pages keep the v2.0 and v2.1 development histories selectable independently.
+Fixed release references compare them with v1.4.5, v1.5.5 and v2.0.0 in both the charts and
+per-query timing tables. A reference appears only when matching results exist for that storage
+backend and platform, so v2.0.0 will also appear for DuckLake once it has been benchmarked there.
+The query history's “Slower than” filter uses the newest available release reference.
+
+To check the baseline queries without lake credentials, install `requirements.txt` and run
+`python3 -m unittest discover -s tests`. Front-end unit tests run with
+`npm --prefix evidence run test:unit`.
+
 ### Testing set-up: Connecting to the ducklake
 - to connect to the ducklake with the credentials created above:
 ```sql
