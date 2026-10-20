@@ -108,7 +108,7 @@
 
     return {
       animation: false,
-      grid: { left: 58, right: 52, top: 12, bottom: 60 },
+      grid: { left: 58, right: 52, top: 12, bottom: 40 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
@@ -122,13 +122,17 @@
         type: 'time',
         min: xMin,
         max: xMax,
-        splitNumber: 4,
+        splitNumber: 2,
         minInterval: 24 * 60 * 60 * 1000,
         axisLabel: {
           formatter: shortDate,
           rotate: 45,
-          margin: 12,
-          hideOverlap: true
+          margin: 8,
+          hideOverlap: true,
+          showMinLabel: false,
+          showMaxLabel: false,
+          align: 'right',
+          verticalAlign: 'middle'
         }
       },
       yAxis: {

@@ -120,7 +120,7 @@
 
     return {
       animation: false,
-      grid: { left: 64, right: 56, top: 16, bottom: 64 },
+      grid: { left: 64, right: 56, top: 16, bottom: 44 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
@@ -136,13 +136,17 @@
         type: 'time',
         min: xMin,
         max: xMax,
-        splitNumber: 6,
+        splitNumber: 2,
         minInterval: 24 * 60 * 60 * 1000,
         axisLabel: {
           formatter: shortDate,
           rotate: 45,
-          margin: 14,
-          hideOverlap: true
+          margin: 8,
+          hideOverlap: true,
+          showMinLabel: false,
+          showMaxLabel: false,
+          align: 'right',
+          verticalAlign: 'middle'
         }
       },
       yAxis: {
