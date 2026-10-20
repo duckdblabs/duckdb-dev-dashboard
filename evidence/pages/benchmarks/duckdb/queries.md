@@ -30,9 +30,6 @@ hide_toc: true
   $: initialVersion = validVersion(versionParam) ? versionParam : undefined;
 </script>
 
-The query plots show the warm-run mean used to calculate the suite geomean. Median and
-fastest–slowest timings are included in each point's tooltip as noise context.
-
 ```sql suite_options
 select
   benchmark_series,
@@ -292,7 +289,11 @@ No query runs match this suite, platform and date range.
 
 <BenchmarkFailureHistory data={query_history} />
 
-## Query performance over time
+<BenchmarkQueryHistoryHeading
+    suite={inputs.suite_select.value}
+    dateStart={inputs.date_select.start}
+    dateEnd={inputs.date_select.end}
+/>
 
 {#if history_summary?.[0]}
 <p>{history_summary[0].query_count} queries across {history_summary[0].run_count} runs.</p>
