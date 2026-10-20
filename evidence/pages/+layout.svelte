@@ -2,6 +2,7 @@
 	import '@evidence-dev/tailwind/fonts.css';
 	import '../app.css';
 	import { EvidenceDefaultLayout } from '@evidence-dev/core-components';
+	import { page } from '$app/stores';
 
 	export let data;
 
@@ -26,8 +27,23 @@
 	$: layoutData = data?.pagesManifest
 		? { ...data, pagesManifest: applySidebarTitles(data.pagesManifest) }
 		: data;
+
+	$: benchmarkStorage =
+		/^\/benchmarks\/(duckdb|ducklake)(?:\/|$)/.exec($page.route.id ?? '')?.[1];
 </script>
 
-<EvidenceDefaultLayout data={layoutData}>
-	<slot slot="content" />
-</EvidenceDefaultLayout>
+<div
+	class:benchmark-duckdb-active={benchmarkStorage === 'duckdb'}
+	class:benchmark-ducklake-active={benchmarkStorage === 'ducklake'}
+>
+	<EvidenceDefaultLayout data={layoutData}>
+		<slot slot="content" />
+	</EvidenceDefaultLayout>
+</div>
+
+<style>
+	:global(.benchmark-duckdb-active aside a[href$='/benchmarks/duckdb']),
+	:global(.benchmark-ducklake-active aside a[href$='/benchmarks/ducklake']) {
+		color: var(--color-primary);
+	}
+</style>

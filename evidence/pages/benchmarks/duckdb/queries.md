@@ -1,6 +1,7 @@
 ---
 title: DuckDB Benchmark Query History
 sidebar_title: Query History
+sidebar_link: false
 full_width: true
 hide_toc: true
 ---
@@ -264,8 +265,6 @@ order by q.query, q.duckdb_version
 
 ```sql history_summary
 select
-  count(distinct query) as query_count,
-  count(distinct run_id) as run_count,
   count(*) filter (where status <> 'ok') as failed_count
 from ${query_history}
 ```
@@ -295,14 +294,11 @@ No query runs match this suite, platform and date range.
     dateEnd={inputs.date_select.end}
 />
 
-{#if history_summary?.[0]}
-<p>{history_summary[0].query_count} queries across {history_summary[0].run_count} runs.</p>
-{#if history_summary[0].failed_count > 0}
+{#if history_summary?.[0]?.failed_count > 0}
 <p>The red × markers show the commit dates of {history_summary[0].failed_count} failed query
 executions, which have no timing and were excluded from their run's geomean. Expand the failure
 history below the geometric mean chart to see each run's failed queries and errors. A red badge indicates that its latest run in the
 selected window failed.</p>
-{/if}
 {/if}
 
 <BenchmarkQueryGrid
