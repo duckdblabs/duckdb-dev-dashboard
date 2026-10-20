@@ -14,10 +14,11 @@
 -- median counts those; the aggregates below drop non-positive timings, which would report such a
 -- query as 0.001 even when most of its runs were 0.0.
 --
--- Failed queries are kept, with NULL timings and their error - this is the one place where the
--- failure is attributable to a specific query, so hiding them here would waste the table.
--- benchmark_geomean.sql filters them out instead, because a failed query has no timing to
--- aggregate.
+-- Failed queries are kept, with NULL timings and their error, when another query in the same
+-- run succeeded. Runs where every query failed are harness/environment diagnostics rather
+-- than benchmark measurements, so they are excluded from the dashboard. Eligibility is per
+-- run_id: a later rerun of the same version/commit can still have useful results.
+-- benchmark_geomean.sql filters failed queries out, because they have no timing to aggregate.
 --
 -- Size: one row per query per run, i.e. roughly 1/30th of query_metrics (which holds one row per
 -- query per warm run per metric). Small enough to ship to the browser; query_metrics is not.
@@ -72,4 +73,10 @@ left join warm_runs w
     on w.run_id = qr.run_id
    and w.query = qr.query
 where not coalesce(r.is_test, false)
+  and exists (
+      select 1
+      from query_results successful
+      where successful.run_id = r.run_id
+        and successful.status = 'ok'
+  )
 order by r."timestamp", r.benchmark, qr.query;

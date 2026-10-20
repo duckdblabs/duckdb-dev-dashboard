@@ -290,6 +290,8 @@ No query runs match this suite, platform and date range.
     dateEnd={inputs.date_select.end}
 />
 
+<BenchmarkFailureHistory data={query_history} />
+
 ## Query performance over time
 
 {#if history_summary?.[0]}
@@ -297,7 +299,7 @@ No query runs match this suite, platform and date range.
 {#if history_summary[0].failed_count > 0}
 <p>The red × markers show the commit dates of {history_summary[0].failed_count} failed query
 executions, which have no timing and were excluded from their run's geomean. Expand the failure
-history below a query to see dates and errors. A red badge indicates that its latest run in the
+history below the geometric mean chart to see each run's failed queries and errors. A red badge indicates that its latest run in the
 selected window failed.</p>
 {/if}
 {/if}

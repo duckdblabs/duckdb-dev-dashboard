@@ -25,3 +25,23 @@ export const queryFailureSummary = (rows = []) => {
     lastFailure: failures[0]
   };
 };
+
+export const benchmarkFailureHistory = (rows = []) => {
+  const runs = new Map();
+  for (const row of rows) {
+    if (!runs.has(row.run_id)) {
+      runs.set(row.run_id, { ...row, queryCount: 0, successfulCount: 0, failures: [] });
+    }
+    const run = runs.get(row.run_id);
+    run.queryCount += 1;
+    if (isQueryFailure(row)) run.failures.push(row);
+    else run.successfulCount += 1;
+  }
+  return [...runs.values()]
+    .filter((run) => run.failures.length > 0)
+    .sort((left, right) => compareRuns(right, left))
+    .map((run) => ({
+      ...run,
+      failures: [...run.failures].sort((left, right) => left.query.localeCompare(right.query))
+    }));
+};

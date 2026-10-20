@@ -12,7 +12,6 @@
     escapeHtml,
     formatSeconds,
     fullTimestamp,
-    isCommitSha,
     previousCommitMap,
     shortDate,
     versionLine,
@@ -156,7 +155,6 @@
   $: baselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
   $: config = chartConfig(rows, baselineRows);
   $: failureSummary = queryFailureSummary(rows);
-  $: failedCount = failureSummary.failures.length;
   $: comparisonTitle = comparison?.kind === 'release_slower'
     ? `Latest 5-point median: ${formatSeconds(comparison.recentMedian)} sec; ${comparison.releaseVersion} annotation: ${formatSeconds(comparison.baselineMedian)} sec`
     : `Latest 3-point median: ${formatSeconds(comparison?.recentMedian)} sec; preceding 5-point median: ${formatSeconds(comparison?.baselineMedian)} sec`;
@@ -183,41 +181,4 @@
     </div>
   </div>
   <ECharts {config} data={rows} height="250px" />
-  {#if failedCount > 0}
-    <details class="mt-2 border-t border-base-300 pt-2 text-xs" open={failureSummary.latestFailed}>
-      <summary class="cursor-pointer text-base-content-muted">
-        {#if failureSummary.latestFailed}
-          Failure details ({failedCount})
-        {:else}
-          {failedCount} past {failedCount === 1 ? 'failure' : 'failures'} · last {shortDate(failureSummary.lastFailure.merge_commit_date)}
-        {/if}
-      </summary>
-      <p class="my-2 text-base-content-muted">
-        {#if failureSummary.latestFailed}
-          The latest run in the selected window failed.
-        {:else}
-          The latest run in the selected window succeeded.
-        {/if}
-        Failed runs have no timing; the red × markers show their commit dates.
-      </p>
-      <ul class="m-0 list-none space-y-3 p-0">
-        {#each failureSummary.failures as failure}
-          <li>
-            <div class="text-base-content-muted">
-              Merged {fullTimestamp(failure.merge_commit_date)} · {failure.duckdb_version}
-              {#if isCommitSha(failure.commit_sha)}
-                · <a
-                    class="underline"
-                    href={`https://github.com/duckdb/duckdb/commit/${failure.commit_sha}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >{failure.commit ?? failure.commit_sha.slice(0, 8)}</a>
-              {/if}
-            </div>
-            <p class="my-1 break-words">{failure.error ?? 'No error was recorded.'}</p>
-          </li>
-        {/each}
-      </ul>
-    </details>
-  {/if}
 </section>
