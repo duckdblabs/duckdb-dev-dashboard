@@ -110,7 +110,7 @@
 
     return {
       animation: false,
-      grid: { left: 58, right: 52, top: 12, bottom: 8 },
+      grid: { left: 40, right: 52, top: 12, bottom: 8 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
@@ -145,7 +145,7 @@
         max: yMax,
         name: `mean (${yUnit.label})`,
         nameLocation: 'middle',
-        nameGap: 43,
+        nameGap: 33,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
       series: [

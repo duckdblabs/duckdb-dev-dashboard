@@ -123,7 +123,7 @@
 
     return {
       animation: false,
-      grid: { left: 64, right: 56, top: 16, bottom: 8 },
+      grid: { left: 44, right: 56, top: 16, bottom: 8 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
@@ -160,7 +160,7 @@
         max: yMax,
         name: `geomean (${yUnit.label})`,
         nameLocation: 'middle',
-        nameGap: 48,
+        nameGap: 36,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
       series: [...runSeries, ...baselineSeries]
