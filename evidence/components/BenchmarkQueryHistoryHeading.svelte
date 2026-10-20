@@ -36,7 +36,7 @@
 
 <div class="mb-4 flex items-center gap-2">
   <h2 class="m-0 text-xl font-semibold">
-    Query performance for {suiteLabel} between {timeWindow}
+    History of {suiteLabel} between {timeWindow}
   </h2>
   <div class="group relative flex-none">
     <button
