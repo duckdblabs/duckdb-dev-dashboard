@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatTimingTick, niceAxisMax, timingUnit } from './benchmarkChartUtils.js';
+import {
+  dateAxisInterval,
+  formatTimingTick,
+  niceAxisMax,
+  timingUnit
+} from './benchmarkChartUtils.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+test('date axes use about ten evenly spaced whole-day intervals', () => {
+  const start = new Date('2026-07-21T00:00:00Z').getTime();
+  const end = new Date('2026-10-21T00:00:00Z').getTime();
+
+  assert.equal(dateAxisInterval(start, end), 10 * DAY_MS);
+  assert.equal(dateAxisInterval(start, start + 5 * DAY_MS), DAY_MS);
+});
 
 test('timings below one second use milliseconds', () => {
   const unit = timingUnit([0.125, 0.95]);

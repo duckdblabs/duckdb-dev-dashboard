@@ -10,6 +10,16 @@ export const chartDate = (value) => {
 
 export const chartTime = (value) => chartDate(value).getTime();
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export const dateAxisInterval = (min, max, splitCount = 10) => {
+  const span = Number(max) - Number(min);
+  if (!Number.isFinite(span) || span <= 0 || !Number.isFinite(splitCount) || splitCount <= 0) {
+    return DAY_MS;
+  }
+  return Math.max(DAY_MS, Math.ceil(span / splitCount / DAY_MS) * DAY_MS);
+};
+
 export const shortDate = (value) => {
   const date = chartDate(value);
   return Number.isNaN(date.getTime()) ? String(value) : `${MONTHS[date.getMonth()]} ${date.getDate()}`;

@@ -9,6 +9,7 @@
     chartDate,
     chartTime,
     commitLinks,
+    dateAxisInterval,
     escapeHtml,
     formatSeconds,
     formatTimingTick,
@@ -120,10 +121,11 @@
         formatter: tooltip
       },
       xAxis: {
-        type: 'time',
+        type: 'value',
         min: xMin,
         max: xMax,
-        splitNumber: 2,
+        splitNumber: 10,
+        interval: dateAxisInterval(xMin, xMax),
         minInterval: 24 * 60 * 60 * 1000,
         axisLabel: {
           formatter: shortDate,
