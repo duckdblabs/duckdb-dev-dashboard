@@ -18,6 +18,7 @@
     versionLineColors,
     versionLineOrder
   } from './benchmarkChartUtils.js';
+  import { hasQueryTiming, isQueryFailure, queryFailureSummary } from './benchmarkFailureUtils.js';
 
   export let data = [];
   export let baselines = [];
@@ -35,8 +36,8 @@
 
   const chartConfig = (rows, baselineRows) => {
     const previousCommitBySha = previousCommitMap(rows);
-    const successful = rows.filter((row) => row.status === 'ok' && Number.isFinite(Number(row.mean_seconds)));
-    const failed = rows.filter((row) => row.status !== 'ok' || !Number.isFinite(Number(row.mean_seconds)));
+    const successful = rows.filter(hasQueryTiming);
+    const failed = rows.filter(isQueryFailure);
     const values = [
       ...successful.map((row) => Number(row.mean_seconds)),
       ...baselineRows.map((row) => Number(row.baseline_seconds)).filter(Number.isFinite)
@@ -111,6 +112,7 @@
         enterable: true,
         hideDelay: 300,
         confine: true,
+        extraCssText: 'max-width: min(420px, 80vw); white-space: normal; overflow-wrap: anywhere;',
         formatter: tooltip
       },
       xAxis: {
@@ -136,16 +138,13 @@
           name: 'failed',
           type: 'scatter',
           data: failed.map((row) => ({ value: [chartTime(row.merge_commit_date), 0], row })),
-          symbolSize: 1,
-          itemStyle: { opacity: 0 },
-          label: {
-            show: true,
-            formatter: '×',
-            position: 'top',
-            color: '#ef4444',
-            fontSize: 18,
-            fontWeight: 'bold'
-          }
+          // A visible symbol is also the tooltip's hover target. The old 1px invisible point
+          // left only a text label to see, which was very difficult to hover.
+          symbol: 'path://M-5,-3L-3,-5L0,-2L3,-5L5,-3L2,0L5,3L3,5L0,2L-3,5L-5,3L-2,0Z',
+          symbolSize: 12,
+          itemStyle: { color: '#ef4444' },
+          clip: false,
+          z: 4
         },
         ...baselineSeries
       ]
@@ -155,7 +154,7 @@
   $: rows = data?.filter?.((row) => row.query === query) ?? [];
   $: baselineRows = baselines?.filter?.((row) => row.query === query) ?? [];
   $: config = chartConfig(rows, baselineRows);
-  $: failedCount = rows.filter((row) => row.status !== 'ok' || !Number.isFinite(Number(row.mean_seconds))).length;
+  $: failureSummary = queryFailureSummary(rows);
   $: comparisonTitle = comparison?.kind === 'release_slower'
     ? `Latest 5-point median: ${formatSeconds(comparison.recentMedian)} sec; ${comparison.releaseVersion} annotation: ${formatSeconds(comparison.baselineMedian)} sec`
     : `Latest 3-point median: ${formatSeconds(comparison?.recentMedian)} sec; preceding 5-point median: ${formatSeconds(comparison?.baselineMedian)} sec`;
@@ -173,8 +172,11 @@
           +{comparison.percentChange.toFixed(1)}% slower
         </span>
       {/if}
-      {#if failedCount > 0}
-        <span class="text-xs font-medium text-negative">× {failedCount} failed</span>
+      {#if failureSummary.latestFailed}
+        <span
+            class="text-xs font-medium text-negative"
+            title={`The latest run in the selected window failed: ${failureSummary.latest.error ?? 'No error was recorded.'}`}
+        >Latest run failed</span>
       {/if}
     </div>
   </div>
