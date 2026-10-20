@@ -110,7 +110,7 @@
 
     return {
       animation: false,
-      grid: { left: 58, right: 52, top: 12, bottom: 40 },
+      grid: { left: 58, right: 52, top: 12, bottom: 8 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',

@@ -123,7 +123,7 @@
 
     return {
       animation: false,
-      grid: { left: 64, right: 56, top: 16, bottom: 44 },
+      grid: { left: 64, right: 56, top: 16, bottom: 8 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
