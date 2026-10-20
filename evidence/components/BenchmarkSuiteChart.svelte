@@ -12,9 +12,11 @@
     commitLinks,
     escapeHtml,
     formatSeconds,
+    formatTimingTick,
     fullTimestamp,
     previousCommitMap,
     shortDate,
+    timingUnit,
     versionLine,
     versionLineColors,
     versionLineOrder
@@ -48,6 +50,7 @@
       ...rows.map((row) => Number(row.geomean_seconds)),
       ...baselineRows.map((row) => Number(row.baseline_seconds))
     ].filter(Number.isFinite);
+    const yUnit = timingUnit(values);
     // headroom above the tallest element: a reference line exactly at the chart maximum sits on
     // the plot border and is indistinguishable from it
     const yMax = (values.length ? Math.max(...values) : 1) * 1.08;
@@ -117,7 +120,7 @@
 
     return {
       animation: false,
-      grid: { left: 64, right: 56, top: 16, bottom: 44 },
+      grid: { left: 64, right: 56, top: 16, bottom: 64 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
@@ -135,16 +138,21 @@
         max: xMax,
         splitNumber: 6,
         minInterval: 24 * 60 * 60 * 1000,
-        axisLabel: { formatter: shortDate }
+        axisLabel: {
+          formatter: shortDate,
+          rotate: 45,
+          margin: 14,
+          hideOverlap: true
+        }
       },
       yAxis: {
         type: 'value',
         min: 0,
         max: yMax,
-        name: 'geomean (sec)',
+        name: `geomean (${yUnit.label})`,
         nameLocation: 'middle',
         nameGap: 48,
-        axisLabel: { formatter: (value) => Number(value).toFixed(3) }
+        axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
       series: [...runSeries, ...baselineSeries]
     };

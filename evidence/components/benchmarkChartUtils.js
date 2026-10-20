@@ -15,6 +15,23 @@ export const shortDate = (value) => {
   return Number.isNaN(date.getTime()) ? String(value) : `${MONTHS[date.getMonth()]} ${date.getDate()}`;
 };
 
+export const timingUnit = (values) => {
+  const finiteValues = values
+    .filter((value) => value !== null && value !== undefined && value !== '')
+    .map(Number)
+    .filter(Number.isFinite);
+  return finiteValues.length > 0 && Math.max(...finiteValues.map(Math.abs)) < 1
+    ? { label: 'ms', multiplier: 1000, precision: 2 }
+    : { label: 'sec', multiplier: 1, precision: 3 };
+};
+
+export const formatTimingTick = (value, unit) => {
+  const scaled = Number(value) * unit.multiplier;
+  return Number.isFinite(scaled)
+    ? String(Number(scaled.toFixed(unit.precision)))
+    : String(value);
+};
+
 const twoDigits = (value) => String(value).padStart(2, '0');
 
 export const fullTimestamp = (value) => {
