@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBenchmarkDisplayQuery, initialBenchmarkSuite } from './benchmarkSuiteUtils.js';
+import {
+  benchmarkSuiteAnchor,
+  createBenchmarkDisplayQuery,
+  initialBenchmarkSuite
+} from './benchmarkSuiteUtils.js';
 
 const suites = ['clickbench', 'h2oai', 'tpcds @ sf100', 'future-suite @ sf10']
   .map((benchmark_series) => ({ benchmark_series }));
@@ -21,6 +25,13 @@ test('a storage backend without TPC-DS defaults to its first available suite', (
   assert.equal(initialBenchmarkSuite('h2oai', []), 'tpcds @ sf100');
 });
 
+test('dynamic overview headings preserve the existing suite anchors', () => {
+  assert.equal(benchmarkSuiteAnchor('TPC-DS @ sf100'), 'tpc-ds--sf100');
+  assert.equal(benchmarkSuiteAnchor('TPC-H @ sf100'), 'tpc-h--sf100');
+  assert.equal(benchmarkSuiteAnchor('ClickBench'), 'clickbench');
+  assert.equal(benchmarkSuiteAnchor('H2O.ai (1 billion rows)'), 'h2oai-1-billion-rows');
+});
+
 test('URL-selected query displays fetch actual SQL without using prerendered rows', () => {
   let fetches = 0;
   const display = createBenchmarkDisplayQuery((text, options) => {
@@ -36,6 +47,21 @@ test('URL-selected query displays fetch actual SQL without using prerendered row
   assert.equal(fetches, 1);
   assert.equal(display(hydrated, true), fresh);
   assert.equal(fetches, 1);
+});
+
+test('the top chart receives the requested suite on first load without a release-line click', () => {
+  const prerendered = [{ benchmark_series: 'tpcds @ sf100', geomean_seconds: 1 }];
+  const requested = [{ benchmark_series: 'tpch @ sf100', geomean_seconds: 2 }];
+  const display = createBenchmarkDisplayQuery((text, options) => {
+    const query = { text, rows: [] };
+    query.fetch = () => { query.rows = options.disableCache ? requested : prerendered; };
+    return query;
+  });
+  const initial = {
+    id: 'geomean', text: "select * where benchmark_series = 'tpch @ sf100'",
+    opts: {}, rows: prerendered
+  };
+  assert.deepEqual(display(initial, true).rows, requested);
 });
 
 test('changing filters replaces the displayed query for that dataset', () => {

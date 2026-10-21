@@ -4,6 +4,7 @@
 
 <script>
   import BenchmarkSuiteChart from './BenchmarkSuiteChart.svelte';
+  import { benchmarkSuiteAnchor } from './benchmarkSuiteUtils.js';
 
   export let suites = [];
   export let data = [];
@@ -17,7 +18,12 @@
 </script>
 
 {#each suites ?? [] as suite (suite.benchmark_series)}
-  <h2 class="mb-4 mt-8 text-xl font-semibold">{suite.suite_label}</h2>
+  <h2
+      id={benchmarkSuiteAnchor(suite.suite_label)}
+      class="markdown mb-4 mt-8 scroll-mt-[6.25rem] text-xl font-semibold"
+  >
+    <a href={`#${benchmarkSuiteAnchor(suite.suite_label)}`}>{suite.suite_label}</a>
+  </h2>
   <BenchmarkSuiteChart
       {data}
       {baselines}

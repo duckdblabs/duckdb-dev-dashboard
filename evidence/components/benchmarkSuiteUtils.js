@@ -5,6 +5,11 @@ export const initialBenchmarkSuite = (requested, suites = []) => {
   return suites[0]?.benchmark_series ?? 'tpcds @ sf100';
 };
 
+export const benchmarkSuiteAnchor = (label) => String(label ?? '')
+  .toLowerCase()
+  .replace(/[^\p{L}\p{N}_ -]/gu, '')
+  .replace(/ /g, '-');
+
 export const createBenchmarkDisplayQuery = (createQuery) => {
   const queries = new Map();
   return (query, refresh = false) => {

@@ -294,6 +294,7 @@ No query runs match this suite, platform and date range.
 
 <BenchmarkQueryHistoryHeading
     suite={inputs.suite_select.value}
+    label={suite_options?.find((suite) => suite.benchmark_series === inputs.suite_select.value)?.suite_label}
     dateStart={inputs.date_select.start}
     dateEnd={inputs.date_select.end}
 />
