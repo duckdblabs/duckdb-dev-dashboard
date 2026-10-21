@@ -163,7 +163,9 @@ where q.storage_type = 'duckdb'
 group by q.run_id
 ```
 
-## TPC-DS @ sf100
+<h2 id="tpc-ds--sf100" class="markdown scroll-mt-[6.25rem]">
+  <a href="#tpc-ds--sf100">TPC-DS @ sf100</a>
+</h2>
 
 <BenchmarkSuiteChart
     data={geomean}
@@ -177,7 +179,9 @@ group by q.run_id
     dateEnd={inputs.date_select.end}
 />
 
-## TPC-H @ sf100
+<h2 id="tpc-h--sf100" class="markdown scroll-mt-[6.25rem]">
+  <a href="#tpc-h--sf100">TPC-H @ sf100</a>
+</h2>
 
 <BenchmarkSuiteChart
     data={geomean}
@@ -191,7 +195,9 @@ group by q.run_id
     dateEnd={inputs.date_select.end}
 />
 
-## ClickBench
+<h2 id="clickbench" class="markdown scroll-mt-[6.25rem]">
+  <a href="#clickbench">ClickBench</a>
+</h2>
 
 <BenchmarkSuiteChart
     data={geomean}

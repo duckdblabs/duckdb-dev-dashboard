@@ -81,55 +81,53 @@ group by all
 order by major desc, minor desc
 ```
 
-<div class="mb-6 rounded-lg border border-base-300 bg-base-100 p-4">
-  <div class="flex flex-wrap items-end gap-x-3">
-    <div>
-      <ButtonGroup
-          name=version_select
-          data={version_options}
-          value=version_line
-          defaultValue={initialVersion ?? version_options?.[0]?.version_line}
-      />
-    </div>
-
-    <div>
-      <DateRange
-          name=date_select
-          data={date_options}
-          dates=merge_commit_date
-          start={initialStart}
-          end={initialEnd}
-          defaultValue={validWindow ? undefined : 'Last 90 Days'}
-      />
-    </div>
-
-    <div class="min-w-[15rem]">
-      <Dropdown
-          name=suite_select
-          data={suite_options}
-          value=benchmark_series
-          label=suite_label
-          defaultValue={initialSuite}
-          title="Benchmark suite"
-      />
-    </div>
+<div class="flex flex-wrap items-end gap-x-3">
+  <div>
+    <ButtonGroup
+        name=version_select
+        data={version_options}
+        value=version_line
+        defaultValue={initialVersion ?? version_options?.[0]?.version_line}
+    />
   </div>
 
-  <div class="flex flex-wrap items-end gap-x-3">
-    <div class="flex min-w-[20rem] items-end gap-2">
-      <Dropdown
-          name=platform_select
-          data={platform_options}
-          value=platform_id
-          label=platform_label
-          defaultValue={initialPlatform}
-          title="Platform"
-          description="OS, CPU architecture and machine type"
-      />
-      <span class="mb-4">
-        <BenchmarkMemoryBadge memory={selected_platform?.[0]?.memory_label} />
-      </span>
-    </div>
+  <div>
+    <DateRange
+        name=date_select
+        data={date_options}
+        dates=merge_commit_date
+        start={initialStart}
+        end={initialEnd}
+        defaultValue={validWindow ? undefined : 'Last 90 Days'}
+    />
+  </div>
+
+  <div class="min-w-[15rem]">
+    <Dropdown
+        name=suite_select
+        data={suite_options}
+        value=benchmark_series
+        label=suite_label
+        defaultValue={initialSuite}
+        title="Benchmark suite"
+    />
+  </div>
+</div>
+
+<div class="flex flex-wrap items-end gap-x-3">
+  <div class="flex min-w-[20rem] items-end gap-2">
+    <Dropdown
+        name=platform_select
+        data={platform_options}
+        value=platform_id
+        label=platform_label
+        defaultValue={initialPlatform}
+        title="Platform"
+        description="OS, CPU architecture and machine type"
+    />
+    <span class="mb-4">
+      <BenchmarkMemoryBadge memory={selected_platform?.[0]?.memory_label} />
+    </span>
   </div>
 </div>
 
@@ -276,16 +274,17 @@ No query runs match this suite, platform and date range.
 </Alert>
 {/if}
 
-## Geometric mean
-
-<BenchmarkSuiteChart
-    data={geomean}
-    baselines={version_baselines}
-    failures={run_failures}
-    series={inputs.suite_select.value}
-    dateStart={inputs.date_select.start}
-    dateEnd={inputs.date_select.end}
-/>
+<div id="geometric-mean" class="scroll-mt-[6.25rem]">
+  <h2 class="markdown"><a href="#geometric-mean">Geometric mean</a></h2>
+  <BenchmarkSuiteChart
+      data={geomean}
+      baselines={version_baselines}
+      failures={run_failures}
+      series={inputs.suite_select.value}
+      dateStart={inputs.date_select.start}
+      dateEnd={inputs.date_select.end}
+  />
+</div>
 
 <BenchmarkFailureHistory data={query_history} />
 
