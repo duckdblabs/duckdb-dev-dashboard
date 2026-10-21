@@ -79,7 +79,7 @@
 <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
   <div class="flex flex-wrap items-end gap-3">
     <label class="block">
-      <span class="mb-1 block text-sm text-base-content-muted">Find query</span>
+      <span class="sr-only">Find query</span>
       <input
           bind:value={search}
           type="search"
@@ -89,7 +89,6 @@
     </label>
 
     <div class="block">
-      <span class="mb-1 block text-sm text-base-content-muted">Show queries</span>
       <div
           class="inline-flex h-8 rounded-md border border-base-300 shadow-sm"
           role="group"
