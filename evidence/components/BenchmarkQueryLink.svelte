@@ -4,6 +4,7 @@
 
 <script>
   import { addBasePath } from '@evidence-dev/sdk/utils/svelte';
+  import { dateRangeUrlValue } from './benchmarkDateUtils.js';
 
   export let storage;
   export let series;
@@ -15,8 +16,8 @@
   $: params = new URLSearchParams({
     suite: series ?? '',
     platform: platform ?? '',
-    start: start ?? '',
-    end: end ?? '',
+    start: dateRangeUrlValue(start) ?? '',
+    end: dateRangeUrlValue(end) ?? '',
     ...(version ? { version } : {})
   });
   $: href = addBasePath(`/benchmarks/${storage}/queries?${params.toString()}`);
