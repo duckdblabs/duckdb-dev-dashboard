@@ -34,7 +34,7 @@
     : 'the selected dates';
 </script>
 
-<div id="query-history" class="mb-4 flex scroll-mt-20 items-center gap-2">
+<div id="query-history" class="mb-4 mt-8 flex scroll-mt-30 items-center gap-2">
   <h2 class="m-0 text-xl font-semibold">
     <a
         href="#query-history"

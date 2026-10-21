@@ -274,16 +274,17 @@ No query runs match this suite, platform and date range.
 </Alert>
 {/if}
 
-## Geometric mean
-
-<BenchmarkSuiteChart
-    data={geomean}
-    baselines={version_baselines}
-    failures={run_failures}
-    series={inputs.suite_select.value}
-    dateStart={inputs.date_select.start}
-    dateEnd={inputs.date_select.end}
-/>
+<div id="geometric-mean" class="scroll-mt-30">
+  <h2 class="markdown"><a href="#geometric-mean">Geometric mean</a></h2>
+  <BenchmarkSuiteChart
+      data={geomean}
+      baselines={version_baselines}
+      failures={run_failures}
+      series={inputs.suite_select.value}
+      dateStart={inputs.date_select.start}
+      dateEnd={inputs.date_select.end}
+  />
+</div>
 
 <BenchmarkFailureHistory data={query_history} />
 
