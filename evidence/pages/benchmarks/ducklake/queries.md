@@ -274,7 +274,7 @@ No query runs match this suite, platform and date range.
 </Alert>
 {/if}
 
-<div id="geometric-mean" class="scroll-mt-30">
+<div id="geometric-mean" class="scroll-mt-[6.25rem]">
   <h2 class="markdown"><a href="#geometric-mean">Geometric mean</a></h2>
   <BenchmarkSuiteChart
       data={geomean}
