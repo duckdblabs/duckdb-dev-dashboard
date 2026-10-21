@@ -13,12 +13,14 @@
 			Object.entries(node.children ?? {}).map(([key, child]) => [key, applySidebarTitles(child)])
 		);
 		const sidebarTitle = node.frontMatter?.sidebar_title;
+		const hasSidebarTitle = typeof sidebarTitle === 'string' && sidebarTitle.length > 0;
 
 		return {
 			...node,
 			children,
+			title: hasSidebarTitle ? sidebarTitle : node.title,
 			frontMatter:
-				typeof sidebarTitle === 'string' && sidebarTitle.length > 0
+				hasSidebarTitle
 					? { ...node.frontMatter, title: sidebarTitle }
 					: node.frontMatter
 		};
