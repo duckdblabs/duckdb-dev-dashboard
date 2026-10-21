@@ -68,7 +68,12 @@ per-query timing tables. A reference appears only when matching results exist fo
 backend and platform, so v2.0.0 will also appear for DuckLake once it has been benchmarked there.
 The query history's “Slower than” filter uses the newest available release reference.
 
-To check the baseline queries without lake credentials, install `requirements.txt` and run
+Overview charts and query-history dropdowns discover suites per storage backend from the results.
+H2O.ai's fixed 1-billion-row dataset appears as `H2O.ai (1 billion rows)` once results arrive.
+Shared names and display order live in `evidence/sources/benchmarks/benchmark_series_list.sql`;
+unrecognised suites use their recorded name. Query-history links accept any discovered suite.
+
+To check the benchmark queries without lake credentials, install `requirements.txt` and run
 `python3 -m unittest discover -s tests`. Front-end unit tests run with
 `npm --prefix evidence run test:unit`.
 

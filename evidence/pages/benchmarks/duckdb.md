@@ -163,47 +163,18 @@ where q.storage_type = 'duckdb'
 group by q.run_id
 ```
 
-<h2 id="tpc-ds--sf100" class="markdown scroll-mt-[6.25rem]">
-  <a href="#tpc-ds--sf100">TPC-DS @ sf100</a>
-</h2>
+```sql suite_options
+select benchmark_series, suite_label
+from benchmarks.benchmark_series_list
+where storage_type = 'duckdb'
+order by suite_order, suite_label
+```
 
-<BenchmarkSuiteChart
+<BenchmarkSuiteOverview
+    suites={suite_options}
     data={geomean}
     baselines={version_baselines}
     failures={run_failures}
-    series="tpcds @ sf100"
-    storage="duckdb"
-    platform={inputs.platform_select.value}
-    version={inputs.version_select}
-    dateStart={inputs.date_select.start}
-    dateEnd={inputs.date_select.end}
-/>
-
-<h2 id="tpc-h--sf100" class="markdown scroll-mt-[6.25rem]">
-  <a href="#tpc-h--sf100">TPC-H @ sf100</a>
-</h2>
-
-<BenchmarkSuiteChart
-    data={geomean}
-    baselines={version_baselines}
-    failures={run_failures}
-    series="tpch @ sf100"
-    storage="duckdb"
-    platform={inputs.platform_select.value}
-    version={inputs.version_select}
-    dateStart={inputs.date_select.start}
-    dateEnd={inputs.date_select.end}
-/>
-
-<h2 id="clickbench" class="markdown scroll-mt-[6.25rem]">
-  <a href="#clickbench">ClickBench</a>
-</h2>
-
-<BenchmarkSuiteChart
-    data={geomean}
-    baselines={version_baselines}
-    failures={run_failures}
-    series="clickbench"
     storage="duckdb"
     platform={inputs.platform_select.value}
     version={inputs.version_select}

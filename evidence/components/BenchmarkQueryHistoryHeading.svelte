@@ -4,6 +4,7 @@
 
 <script>
   export let suite;
+  export let label = undefined;
   export let dateStart;
   export let dateEnd;
 
@@ -28,7 +29,7 @@
     }).format(date);
   };
 
-  $: suiteLabel = suiteLabels[suite] ?? suite ?? 'the selected benchmark suite';
+  $: suiteLabel = label ?? suiteLabels[suite] ?? suite ?? 'the selected benchmark suite';
   $: timeWindow = dateStart && dateEnd
     ? `${displayDate(dateStart)} and ${displayDate(dateEnd)}`
     : 'the selected dates';

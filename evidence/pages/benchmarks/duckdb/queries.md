@@ -10,7 +10,21 @@ hide_toc: true
 	import { page as pageStore } from '$app/stores';
 	import { browser as isBrowser } from '$app/environment';
 
-  const allowedSuites = new Set(['tpcds @ sf100', 'tpch @ sf100', 'clickbench']);
+  import { createBenchmarkDisplayQuery, initialBenchmarkSuite } from '$lib/benchmarkSuiteUtils.js';
+  import { Query as BrowserQuery } from '@evidence-dev/sdk/usql';
+  import { getQueryFunction } from '@evidence-dev/component-utilities/buildQuery';
+
+  const executeQuery = getQueryFunction();
+  const queryForDisplay = createBenchmarkDisplayQuery((text, options) =>
+    BrowserQuery.create(text, executeQuery, options));
+
+  $: refreshDisplay = isBrowser && Boolean(suiteParam);
+  $: displayGeomean = queryForDisplay(geomean, refreshDisplay);
+  $: displayVersionBaselines = queryForDisplay(version_baselines, refreshDisplay);
+  $: displayRunFailures = queryForDisplay(run_failures, refreshDisplay);
+  $: displayHistory = queryForDisplay(query_history, refreshDisplay);
+  $: displayQueryBaselines = queryForDisplay(query_baselines, refreshDisplay);
+  $: displaySummary = queryForDisplay(history_summary, refreshDisplay);
   const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
     && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
   const validPlatform = (value) => /^[a-z0-9._-]+\|[a-z0-9._-]+\|[a-z0-9._-]+$/i.test(value ?? '');
@@ -21,7 +35,7 @@ hide_toc: true
 	$: startParam = isBrowser ? $pageStore.url.searchParams.get('start') : null;
 	$: endParam = isBrowser ? $pageStore.url.searchParams.get('end') : null;
 	$: versionParam = isBrowser ? $pageStore.url.searchParams.get('version') : null;
-  $: initialSuite = allowedSuites.has(suiteParam) ? suiteParam : 'tpcds @ sf100';
+  $: initialSuite = initialBenchmarkSuite(suiteParam, suite_options ?? []);
   $: initialPlatform = validPlatform(platformParam)
     ? platformParam
     : 'linux|x86_64|c6id.4xlarge';
@@ -32,19 +46,9 @@ hide_toc: true
 </script>
 
 ```sql suite_options
-select
-  benchmark_series,
-  case benchmark_series
-    when 'tpcds @ sf100' then 'TPC-DS @ sf100'
-    when 'tpch @ sf100' then 'TPC-H @ sf100'
-    when 'clickbench' then 'ClickBench'
-    else benchmark_series
-  end as suite_label
-from (
-  select distinct benchmark_series
-  from benchmarks.query_times
-  where storage_type = 'duckdb'
-)
+select benchmark_series, suite_label
+from benchmarks.benchmark_series_list
+where storage_type = 'duckdb'
 order by suite_label
 ```
 
@@ -268,7 +272,7 @@ select
 from ${query_history}
 ```
 
-{#if query_history.dataLoaded && query_history.length === 0}
+{#if $displayHistory.dataLoaded && $displayHistory.length === 0}
 <Alert status="warning">
 No query runs match this suite, platform and date range.
 </Alert>
@@ -277,33 +281,34 @@ No query runs match this suite, platform and date range.
 <div id="geometric-mean" class="scroll-mt-[6.25rem]">
   <h2 class="markdown"><a href="#geometric-mean">Geometric mean</a></h2>
   <BenchmarkSuiteChart
-      data={geomean}
-      baselines={version_baselines}
-      failures={run_failures}
+      data={$displayGeomean}
+      baselines={$displayVersionBaselines}
+      failures={$displayRunFailures}
       series={inputs.suite_select.value}
       dateStart={inputs.date_select.start}
       dateEnd={inputs.date_select.end}
   />
 </div>
 
-<BenchmarkFailureHistory data={query_history} />
+<BenchmarkFailureHistory data={$displayHistory} />
 
 <BenchmarkQueryHistoryHeading
     suite={inputs.suite_select.value}
+    label={suite_options?.find((suite) => suite.benchmark_series === inputs.suite_select.value)?.suite_label}
     dateStart={inputs.date_select.start}
     dateEnd={inputs.date_select.end}
 />
 
-{#if history_summary?.[0]?.failed_count > 0}
-<p>The red × markers show the commit dates of {history_summary[0].failed_count} failed query
+{#if $displaySummary?.[0]?.failed_count > 0}
+<p>The red × markers show the commit dates of {$displaySummary[0].failed_count} failed query
 executions, which have no timing and were excluded from their run's geomean. Expand the failure
 history below the geometric mean chart to see each run's failed queries and errors. A red badge indicates that its latest run in the
 selected window failed.</p>
 {/if}
 
 <BenchmarkQueryGrid
-    data={query_history}
-    baselines={query_baselines}
+    data={$displayHistory}
+    baselines={$displayQueryBaselines}
     dateStart={inputs.date_select.start}
     dateEnd={inputs.date_select.end}
 />
