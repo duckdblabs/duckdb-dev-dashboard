@@ -34,9 +34,16 @@
     : 'the selected dates';
 </script>
 
-<div class="mb-4 flex items-center gap-2">
+<div id="query-history" class="mb-4 flex scroll-mt-20 items-center gap-2">
   <h2 class="m-0 text-xl font-semibold">
-    History of {suiteLabel} between {timeWindow}
+    <a
+        href="#query-history"
+        title="Link to query history"
+        class="group inline-flex items-baseline gap-1 text-inherit no-underline"
+    >
+      History of {suiteLabel} between {timeWindow}
+      <span aria-hidden="true" class="text-base-content-muted group-hover:text-primary">#</span>
+    </a>
   </h2>
   <div class="group relative flex-none">
     <button

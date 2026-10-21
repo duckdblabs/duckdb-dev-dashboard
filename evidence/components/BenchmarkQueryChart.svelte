@@ -179,9 +179,21 @@
     : `Latest 3-point median: ${formatSeconds(comparison?.recentMedian)} sec; preceding 5-point median: ${formatSeconds(comparison?.baselineMedian)} sec`;
 </script>
 
-<section id={`query-${query}`} class="min-h-[300px] rounded-md border border-base-300 bg-base-100 p-3">
+<section
+    id={`query-${query}`}
+    class="min-h-[300px] scroll-mt-20 rounded-md border border-base-300 bg-base-100 p-3"
+>
   <div class="flex items-baseline justify-between gap-2">
-    <h3 class="m-0 text-sm font-semibold">{query}</h3>
+    <h3 class="m-0 text-sm font-semibold">
+      <a
+          href={`#query-${query}`}
+          title={`Link to ${query}`}
+          class="group inline-flex items-baseline gap-1 text-inherit no-underline"
+      >
+        {query}
+        <span aria-hidden="true" class="text-base-content-muted group-hover:text-primary">#</span>
+      </a>
+    </h3>
     <div class="flex flex-wrap items-center justify-end gap-2">
       {#if comparison?.isSlower}
         <span
