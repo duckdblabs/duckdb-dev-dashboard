@@ -7,6 +7,7 @@
   import { page } from '$app/stores';
   import { replaceState } from '$app/navigation';
   import { getReadonlyInputContext } from '@evidence-dev/sdk/utils/svelte';
+  import { dateRangeUrlValue } from './benchmarkDateUtils.js';
 
   const inputs = getReadonlyInputContext();
 
@@ -24,8 +25,8 @@
     const url = new URL(window.location.href);
     url.searchParams.set('suite', suite);
     url.searchParams.set('platform', platform);
-    url.searchParams.set('start', start);
-    url.searchParams.set('end', end);
+    url.searchParams.set('start', dateRangeUrlValue(start));
+    url.searchParams.set('end', dateRangeUrlValue(end));
     url.searchParams.set('version', version);
     if (url.href !== window.location.href) replaceState(url, $page.state);
   };
