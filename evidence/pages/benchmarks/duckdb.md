@@ -13,8 +13,7 @@ where storage_type = 'duckdb'
 ```
 
 ```sql version_options
--- The release lines (v2.0, v2.1, ...) that have plottable runs, oldest first. The button group
--- defaults to the first: v2.0 is the line of interest for now, v2.1 only recently forked.
+-- The release lines that have plottable runs, newest first. The first is selected by default.
 select
   'v' || regexp_extract(duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) as version_line,
   regexp_extract(duckdb_version, '^v?([0-9]+)\.', 1)::int as major,
@@ -23,7 +22,7 @@ from benchmarks.geomean_runs
 where storage_type = 'duckdb'
   and merge_commit_date is not null
 group by all
-order by major, minor
+order by major desc, minor desc
 ```
 
 <ButtonGroup
