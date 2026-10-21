@@ -12,6 +12,28 @@ where storage_type = 'duckdb'
   and merge_commit_date is not null
 ```
 
+```sql version_options
+-- The release lines (v2.0, v2.1, ...) that have plottable runs, oldest first. The button group
+-- defaults to the first: v2.0 is the line of interest for now, v2.1 only recently forked.
+select
+  'v' || regexp_extract(duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) as version_line,
+  regexp_extract(duckdb_version, '^v?([0-9]+)\.', 1)::int as major,
+  regexp_extract(duckdb_version, '^v?[0-9]+\.([0-9]+)', 1)::int as minor
+from benchmarks.geomean_runs
+where storage_type = 'duckdb'
+  and merge_commit_date is not null
+group by all
+order by major, minor
+```
+
+<ButtonGroup
+    name=version_select
+    data={version_options}
+    value=version_line
+    defaultValue={version_options?.[0]?.version_line}
+    title="Release line"
+/>
+
 <DateRange
     name=date_select
     data={date_options}
@@ -47,29 +69,6 @@ where platform_id = '${inputs.platform_select.value}'
 <span class="mb-4 mr-2 inline-block align-bottom">
   <BenchmarkMemoryBadge memory={selected_platform?.[0]?.memory_label} />
 </span>
-
-```sql version_options
--- The release lines (v2.0, v2.1, ...) that have plottable runs, oldest first. The button group
--- defaults to the first: v2.0 is the line of interest for now, v2.1 only recently forked.
-select
-  'v' || regexp_extract(duckdb_version, '^v?([0-9]+\.[0-9]+)', 1) as version_line,
-  regexp_extract(duckdb_version, '^v?([0-9]+)\.', 1)::int as major,
-  regexp_extract(duckdb_version, '^v?[0-9]+\.([0-9]+)', 1)::int as minor
-from benchmarks.geomean_runs
-where storage_type = 'duckdb'
-  and merge_commit_date is not null
-group by all
-order by major, minor
-```
-
-<ButtonGroup
-    name=version_select
-    data={version_options}
-    value=version_line
-    defaultValue={version_options?.[0]?.version_line}
-    title="Release line"
-/>
-
 
 <!-- dataLoaded: without it the warning flashes while the query is still running -->
 {#if geomean.dataLoaded && geomean.length === 0}

@@ -95,6 +95,16 @@ order by major, minor
   </div>
 
   <div>
+    <ButtonGroup
+        name=version_select
+        data={version_options}
+        value=version_line
+        defaultValue={initialVersion ?? version_options?.[0]?.version_line}
+        title="Release line"
+    />
+  </div>
+
+  <div>
     <DateRange
         name=date_select
         data={date_options}
@@ -119,16 +129,6 @@ order by major, minor
     <span class="mb-4">
       <BenchmarkMemoryBadge memory={selected_platform?.[0]?.memory_label} />
     </span>
-  </div>
-
-  <div>
-    <ButtonGroup
-        name=version_select
-        data={version_options}
-        value=version_line
-        defaultValue={initialVersion ?? version_options?.[0]?.version_line}
-        title="Release line"
-    />
   </div>
 </div>
 
