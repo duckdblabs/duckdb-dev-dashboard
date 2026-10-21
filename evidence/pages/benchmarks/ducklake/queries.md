@@ -100,7 +100,6 @@ order by major, minor
         data={version_options}
         value=version_line
         defaultValue={initialVersion ?? version_options?.[0]?.version_line}
-        title="Release line"
     />
   </div>
 
@@ -112,7 +111,6 @@ order by major, minor
         start={initialStart}
         end={initialEnd}
         defaultValue={validWindow ? undefined : 'Last 90 Days'}
-        title="Time window"
     />
   </div>
 

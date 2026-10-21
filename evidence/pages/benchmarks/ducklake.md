@@ -31,7 +31,6 @@ order by major, minor
     data={version_options}
     value=version_line
     defaultValue={version_options?.[0]?.version_line}
-    title="Release line"
 />
 
 <DateRange
