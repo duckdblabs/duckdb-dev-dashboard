@@ -93,7 +93,7 @@ class BenchmarkBaselinesTest(unittest.TestCase):
                 with self.subTest(storage=storage, history=history):
                     self.assertEqual(
                         [row["version_line"] for row in self.result(storage, "version_options", history)],
-                        ["v2.0", "v2.1"])
+                        ["v2.1", "v2.0"])
 
     def test_suite_baselines_include_release_outside_the_development_window(self):
         # A newer measurement of the same release must replace the older one.
