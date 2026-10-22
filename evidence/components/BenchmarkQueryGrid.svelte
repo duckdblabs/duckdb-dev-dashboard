@@ -24,10 +24,11 @@
     grouped.get(row.query).push(row);
     return grouped;
   }, new Map());
-  $: queries = [...rowsByQuery.keys()].sort(collator.compare);
+  $: queries = [...new Set([...rowsByQuery.keys(), ...(baselines ?? []).map((row) => row.query)])]
+    .sort(collator.compare);
   $: recentComparisons = Object.fromEntries(queries.map((query) => [
     query,
-    scoreRecentlySlower(rowsByQuery.get(query))
+    scoreRecentlySlower(rowsByQuery.get(query) ?? [])
   ]));
   $: annotationVersion = latestAnnotationVersion(baselines);
   $: annotationLabel = annotationVersion?.replace(/^v/, '') ?? 'release';
@@ -36,7 +37,7 @@
     .map((row) => [row.query, row.baseline_seconds]));
   $: releaseComparisons = Object.fromEntries(queries.map((query) => [
     query,
-    scoreReleaseSlower(rowsByQuery.get(query), annotationBaselines[query], annotationVersion)
+    scoreReleaseSlower(rowsByQuery.get(query) ?? [], annotationBaselines[query], annotationVersion)
   ]));
   $: filterModes = [
     { value: 'all', label: 'All' },

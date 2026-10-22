@@ -7,7 +7,7 @@
   import BenchmarkQueryLink from './BenchmarkQueryLink.svelte';
   import {
     baselineColor,
-    chartDate,
+    chartDateBounds,
     chartTime,
     commitLinks,
     dateAxisInterval,
@@ -35,13 +35,6 @@
   export let dateEnd = undefined;
   export let version = undefined;
 
-  const dateBound = (value, extraDays = 0) => {
-    const date = chartDate(value);
-    if (Number.isNaN(date.getTime())) return undefined;
-    date.setDate(date.getDate() + extraDays);
-    return date.getTime();
-  };
-
   const isComplete = (row) => Number(row.queries_failed ?? 0) === 0;
 
   const chartConfig = (rows, baselineRows, failedByRun) => {
@@ -58,10 +51,7 @@
     // the plot border and is indistinguishable from it. Round the result so the top tick remains
     // as readable as the regular interval ticks below it.
     const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
-    const times = rows.map((row) => chartTime(row.merge_commit_date));
-    const xMin = dateBound(dateStart) ?? Math.min(...times);
-    // the page query's end bound is end + 2 days; see the geomean query for why
-    const xMax = dateBound(dateEnd, 2) ?? Math.max(...times);
+    const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
 
     const tooltip = (params) => {
       const row = params?.data?.row;
@@ -177,16 +167,28 @@
     (failures ?? []).filter((row) => runIds.has(row.run_id)).map((row) => [row.run_id, row.failed_queries])
   );
   $: incompleteCount = rows.filter((row) => !isComplete(row)).length;
+  $: incompleteBaselines = baselineRows.filter((row) => !isComplete(row));
   $: config = chartConfig(rows, baselineRows, failedByRun);
 </script>
 
-{#if rows.length > 0}
+{#if rows.length > 0 || baselineRows.length > 0}
+  {#if rows.length === 0}
+    <p class="text-xs text-base-content-muted">
+      Release baselines are available; no development runs match this platform and date range.
+    </p>
+  {/if}
   {#if incompleteCount > 0}
     <p class="text-xs text-base-content-muted">
       {incompleteCount} of {rows.length} runs are incomplete (hollow markers): some queries failed, so their
       geomean is over fewer queries and not directly comparable.
     </p>
   {/if}
+  {#each incompleteBaselines as baseline}
+    <p class="text-xs text-base-content-muted">
+      {baseline.duckdb_version} baseline is incomplete: {baseline.queries_ok} of
+      {baseline.queries_attempted} queries succeeded. Its geometric mean excludes failed queries.
+    </p>
+  {/each}
   <ECharts {config} data={rows} height="320px" />
   {#if storage && platform && dateStart && dateEnd}
     <BenchmarkQueryLink

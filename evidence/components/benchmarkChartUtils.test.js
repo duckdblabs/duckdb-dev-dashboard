@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   baselineColor,
+  chartDateBounds,
   dateAxisInterval,
   formatTimingTick,
   latestReleaseVersions,
@@ -11,6 +12,21 @@ import {
 } from './benchmarkChartUtils.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+test('release-only charts span the selected dates without development points', () => {
+  const bounds = chartDateBounds([], '2026-07-24', '2026-10-22');
+  assert.equal(bounds.min, new Date('2026-07-24').getTime());
+  assert.equal(bounds.max, new Date('2026-10-24').getTime());
+});
+
+test('charts have finite date bounds while filters load and for a single development point', () => {
+  const empty = chartDateBounds([]);
+  assert.ok(Number.isFinite(empty.min));
+  assert.ok(Number.isFinite(empty.max));
+  assert.equal(empty.max - empty.min, 90 * DAY_MS);
+  const single = chartDateBounds([{ merge_commit_date: '2026-10-21' }]);
+  assert.equal(single.max - single.min, DAY_MS);
+});
 
 test('date axes use about ten evenly spaced whole-day intervals', () => {
   const start = new Date('2026-07-21T00:00:00Z').getTime();

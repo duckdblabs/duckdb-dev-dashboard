@@ -13,13 +13,13 @@ import duckdb
 PAGES = Path(__file__).resolve().parents[1] / "evidence/pages/benchmarks"
 
 
-def page_query(storage, name, history=False):
+def page_query(storage, name, history=False, suite="tpch @ sf100"):
     path = PAGES / storage / "queries.md" if history else PAGES / f"{storage}.md"
     sql = re.search(rf"```sql {name}\n(.*?)\n```", path.read_text(), re.S).group(1)
     for dependency in ("platform_options", "geomean", "query_history", "run_options"):
         sql = sql.replace("${" + dependency + "}", dependency)
     return (sql.replace("${inputs.platform_select.value}", "linux|x86_64|test")
-            .replace("${inputs.suite_select.value}", "tpch @ sf100")
+            .replace("${inputs.suite_select.value}", suite)
             .replace("${inputs.run_select.value}", f"{storage}-selected"))
 
 
@@ -33,7 +33,8 @@ class BenchmarkBaselinesTest(unittest.TestCase):
                 run_id varchar, storage_type varchar, benchmark_series varchar,
                 duckdb_version varchar, run_timestamp timestamp, merge_commit_date timestamp,
                 geomean_seconds double, machine_label varchar, cpu_arch_label varchar,
-                os varchar, queries_sha varchar
+                os varchar, queries_sha varchar,
+                queries_ok int, queries_attempted int, queries_failed int
             );
             create table benchmarks.query_times (
                 run_id varchar, storage_type varchar, benchmark_series varchar,
@@ -59,7 +60,7 @@ class BenchmarkBaselinesTest(unittest.TestCase):
                 self.con.execute("""
                     insert into benchmarks.geomean_runs values
                         (?, ?, 'tpch @ sf100', ?, '2026-09-01', ?, 1,
-                         'test', 'x86_64', 'linux', 'queries-a')
+                         'test', 'x86_64', 'linux', 'queries-a', 15, 15, 0)
                 """, [f"{storage}-{version}", storage, version, merge_date])
                 for query in ("slow", "fast", "neutral", "zero", "failed"):
                     seconds = 0 if query == "zero" else (2 if version == "v1.5.5" else 1)
@@ -75,15 +76,16 @@ class BenchmarkBaselinesTest(unittest.TestCase):
         """)
 
     def query_row(self, storage, run_id, version, query, seconds, *,
-                  machine="test", query_set="queries-a", timestamp="2026-09-01"):
+                  machine="test", query_set="queries-a", timestamp="2026-09-01",
+                  suite="tpch @ sf100"):
         self.con.execute("""
             insert into benchmarks.query_times values
-                (?, ?, 'tpch @ sf100', ?, ?, ?, ?, ?, 10, ?, ?, 'x86_64', 'linux', ?)
-        """, [run_id, storage, version, timestamp, query, seconds, seconds,
+                (?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, 'x86_64', 'linux', ?)
+        """, [run_id, storage, suite, version, timestamp, query, seconds, seconds,
               "failed" if seconds is None else "ok", machine, query_set])
 
-    def result(self, storage, name, history=False):
-        cursor = self.con.execute(page_query(storage, name, history))
+    def result(self, storage, name, history=False, suite="tpch @ sf100"):
+        cursor = self.con.execute(page_query(storage, name, history, suite))
         columns = [column[0] for column in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -100,7 +102,8 @@ class BenchmarkBaselinesTest(unittest.TestCase):
         self.con.execute("""
             insert into benchmarks.geomean_runs
                 select 'new-release', storage_type, benchmark_series, duckdb_version,
-                       '2026-09-02', null, 3, machine_label, cpu_arch_label, os, queries_sha
+                       '2026-09-02', null, 3, machine_label, cpu_arch_label, os, queries_sha,
+                       queries_ok, queries_attempted, queries_failed
                 from benchmarks.geomean_runs
                 where storage_type = 'duckdb' and duckdb_version = 'v2.0.0';
         """)
@@ -150,7 +153,8 @@ class BenchmarkBaselinesTest(unittest.TestCase):
             insert into benchmarks.geomean_runs
                 select 'ducklake-release', 'ducklake', benchmark_series, duckdb_version,
                        run_timestamp, merge_commit_date, geomean_seconds,
-                       machine_label, cpu_arch_label, os, queries_sha
+                       machine_label, cpu_arch_label, os, queries_sha,
+                       queries_ok, queries_attempted, queries_failed
                 from benchmarks.geomean_runs
                 where storage_type = 'duckdb' and duckdb_version = 'v2.0.0';
         """)
@@ -162,6 +166,65 @@ class BenchmarkBaselinesTest(unittest.TestCase):
         self.assertTrue(any(row["duckdb_version"] == "v2.0.0" for row in baselines))
         slow = next(row for row in self.result("ducklake", "query_times") if row["query"] == "slow")
         self.assertEqual(slow["ratio vs v2.0.0"], 1.2)
+
+    def add_h2o_baselines(self):
+        for storage in ("duckdb", "ducklake"):
+            self.con.execute("""
+                insert into benchmarks.geomean_runs values
+                    (?, ?, 'h2oai', 'v1.5.6', '2026-10-21', null, 2,
+                     'test', 'x86_64', 'linux', 'h2o-queries', 14, 15, 1),
+                    (?, ?, 'h2oai', 'v1.5.6', '2026-10-22', null, 99,
+                     'other', 'x86_64', 'linux', 'h2o-queries', 14, 15, 1);
+            """, [f"{storage}-h2o", storage, f"{storage}-other-h2o", storage])
+            self.query_row(storage, f"{storage}-h2o", "v1.5.6", "groupby_q01", 2,
+                           query_set="h2o-queries", suite="h2oai")
+            self.query_row(storage, f"{storage}-other-h2o", "v1.5.6", "groupby_q01", 99,
+                           query_set="h2o-queries", suite="h2oai", machine="other")
+            self.query_row(storage, f"{storage}-h2o", "v1.5.6", "join_q05", None,
+                           query_set="h2o-queries", suite="h2oai")
+
+    def test_release_only_suite_appears_on_both_overviews_with_partial_run_counts(self):
+        self.add_h2o_baselines()
+        for storage in ("duckdb", "ducklake"):
+            with self.subTest(storage=storage):
+                baseline = next(row for row in self.result(storage, "version_baselines")
+                                if row["benchmark_series"] == "h2oai")
+                self.assertEqual(baseline, {
+                    "benchmark_series": "h2oai", "duckdb_version": "v1.5.6",
+                    "baseline_seconds": 2, "queries_ok": 14,
+                    "queries_attempted": 15, "queries_failed": 1})
+
+    def test_release_only_query_history_uses_selected_suite_and_platform(self):
+        self.add_h2o_baselines()
+        self.con.execute("delete from geomean; delete from query_history;")
+        for storage in ("duckdb", "ducklake"):
+            with self.subTest(storage=storage):
+                baselines = self.result(storage, "version_baselines", True, "h2oai")
+                self.assertEqual(len(baselines), 1)
+                self.assertEqual(baselines[0]["baseline_seconds"], 2)
+                self.assertEqual(baselines[0]["queries_failed"], 1)
+                self.assertEqual(self.result(storage, "query_baselines", True, "h2oai"), [{
+                    "query": "groupby_q01", "duckdb_version": "v1.5.6", "baseline_seconds": 2}])
+
+    def test_suite_baselines_still_exclude_incompatible_query_sets_and_platforms(self):
+        self.con.execute("""
+            insert into benchmarks.geomean_runs
+                select 'wrong-query-set', storage_type, benchmark_series, duckdb_version,
+                       '2026-10-22', null, 99, machine_label, cpu_arch_label, os,
+                       'other-queries', queries_ok, queries_attempted, queries_failed
+                from benchmarks.geomean_runs where duckdb_version = 'v1.5.5';
+            insert into benchmarks.geomean_runs
+                select 'wrong-platform', storage_type, benchmark_series, duckdb_version,
+                       '2026-10-22', null, 99, 'other', cpu_arch_label, os,
+                       queries_sha, queries_ok, queries_attempted, queries_failed
+                from benchmarks.geomean_runs
+                where duckdb_version = 'v1.5.5' and run_id <> 'wrong-query-set';
+        """)
+        for storage in ("duckdb", "ducklake"):
+            for history in (False, True):
+                with self.subTest(storage=storage, history=history):
+                    self.assertTrue(all(row["baseline_seconds"] == 1 for row in
+                                        self.result(storage, "version_baselines", history)))
 
 
 if __name__ == "__main__":
