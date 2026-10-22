@@ -69,7 +69,7 @@ where platform_id = '${inputs.platform_select.value}'
 </span>
 
 <!-- dataLoaded: without it the warning flashes while the query is still running -->
-{#if geomean.dataLoaded && geomean.length === 0}
+{#if geomean.dataLoaded && geomean.length === 0 && version_baselines.dataLoaded && version_baselines.length === 0}
 <Alert status="warning">
 No runs match this platform and date range.
 </Alert>
@@ -122,23 +122,27 @@ order by r.merge_commit_date, r.run_timestamp
 ```
 
 ```sql version_baselines
--- One baseline per stable duckdb version per chart. The chart keeps the newest patch from each
--- of the two newest minor release lines.
---
--- Deliberately NOT filtered by the date range: a baseline is a fixed point of comparison, and
--- narrowing the window should not make it vanish. The releases were measured well before most of
--- the alpha runs. The window only decides which platform and query sets are on the chart to match.
+-- One baseline per stable version, using the latest matching measurement.
+-- Keep query sets comparable when development runs are plotted. A suite with no
+-- development runs still shows its release baselines on the selected platform.
+-- Baselines are independent of the selected date range.
 select
   r.benchmark_series,
   r.duckdb_version,
   -- the latest matching run of that version
-  arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
+  arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds,
+  arg_max(r.queries_ok, r.run_timestamp) as queries_ok,
+  arg_max(r.queries_attempted, r.run_timestamp) as queries_attempted,
+  arg_max(r.queries_failed, r.run_timestamp) as queries_failed
 from benchmarks.geomean_runs r
+join ${platform_options} p
+  on p.platform_id = '${inputs.platform_select.value}'
+ and p.machine_label = r.machine_label
+ and p.cpu_arch_label = r.cpu_arch_label
+ and p.os is not distinct from r.os
 where r.storage_type = 'duckdb'
   and regexp_full_match(r.duckdb_version, 'v?[0-9]+\.[0-9]+\.[0-9]+')
-  -- the geomean query already carries the platform filter and identifies each benchmark series,
-  -- so matching a row of it applies both here too
-  and exists (
+  and (exists (
     select 1
     from ${geomean} g
     where g.benchmark_series = r.benchmark_series
@@ -146,7 +150,9 @@ where r.storage_type = 'duckdb'
       and g.cpu_arch_label   = r.cpu_arch_label
       and g.os               is not distinct from r.os
       and g.queries_sha      = r.queries_sha
-  )
+  ) or not exists (
+    select 1 from ${geomean} g where g.benchmark_series = r.benchmark_series
+  ))
 group by r.benchmark_series, r.duckdb_version
 order by r.benchmark_series, r.duckdb_version
 ```

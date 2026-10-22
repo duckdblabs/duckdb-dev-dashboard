@@ -177,11 +177,20 @@ order by r.merge_commit_date, r.run_timestamp
 select
   r.benchmark_series,
   r.duckdb_version,
-  arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds
+  arg_max(r.geomean_seconds, r.run_timestamp) as baseline_seconds,
+  arg_max(r.queries_ok, r.run_timestamp) as queries_ok,
+  arg_max(r.queries_attempted, r.run_timestamp) as queries_attempted,
+  arg_max(r.queries_failed, r.run_timestamp) as queries_failed
 from benchmarks.geomean_runs r
+join ${platform_options} p
+  on p.platform_id = '${inputs.platform_select.value}'
+ and p.machine_label = r.machine_label
+ and p.cpu_arch_label = r.cpu_arch_label
+ and p.os is not distinct from r.os
 where r.storage_type = 'duckdb'
+  and r.benchmark_series = '${inputs.suite_select.value}'
   and regexp_full_match(r.duckdb_version, 'v?[0-9]+\.[0-9]+\.[0-9]+')
-  and exists (
+  and (exists (
     select 1
     from ${geomean} g
     where g.benchmark_series = r.benchmark_series
@@ -189,7 +198,9 @@ where r.storage_type = 'duckdb'
       and g.cpu_arch_label   = r.cpu_arch_label
       and g.os               is not distinct from r.os
       and g.queries_sha      = r.queries_sha
-  )
+  ) or not exists (
+    select 1 from ${geomean} g where g.benchmark_series = r.benchmark_series
+  ))
 group by r.benchmark_series, r.duckdb_version
 order by r.duckdb_version
 ```
@@ -256,12 +267,12 @@ where q.storage_type = 'duckdb'
   and regexp_full_match(q.duckdb_version, 'v?[0-9]+\.[0-9]+\.[0-9]+')
   and q.status = 'ok'
   and q.mean_seconds is not null
-  and exists (
+  and (exists (
     select 1
     from ${query_history} h
     where h.query = q.query
       and h.queries_sha = q.queries_sha
-  )
+  ) or not exists (select 1 from ${query_history}))
 group by q.query, q.duckdb_version
 order by q.query, q.duckdb_version
 ```
@@ -272,7 +283,7 @@ select
 from ${query_history}
 ```
 
-{#if $displayHistory.dataLoaded && $displayHistory.length === 0}
+{#if $displayHistory.dataLoaded && $displayHistory.length === 0 && $displayQueryBaselines.dataLoaded && $displayQueryBaselines.length === 0}
 <Alert status="warning">
 No query runs match this suite, platform and date range.
 </Alert>

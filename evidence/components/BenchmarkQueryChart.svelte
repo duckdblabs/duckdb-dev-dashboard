@@ -6,7 +6,7 @@
   import { ECharts } from '@evidence-dev/core-components';
   import {
     baselineColor,
-    chartDate,
+    chartDateBounds,
     chartTime,
     commitLinks,
     dateAxisInterval,
@@ -32,13 +32,6 @@
   export let dateEnd;
   export let comparison = null;
 
-  const dateBound = (value, extraDays = 0) => {
-    const date = chartDate(value);
-    if (Number.isNaN(date.getTime())) return undefined;
-    date.setDate(date.getDate() + extraDays);
-    return date.getTime();
-  };
-
   const chartConfig = (rows, baselineRows) => {
     const previousCommitBySha = previousCommitMap(rows);
     const successful = rows.filter(hasQueryTiming);
@@ -49,9 +42,7 @@
     ];
     const yUnit = timingUnit(values);
     const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
-    const xMin = dateBound(dateStart) ?? Math.min(...rows.map((row) => chartTime(row.merge_commit_date)));
-    // Match the dashboard's inclusive end-date workaround: the page query uses end + 2 days.
-    const xMax = dateBound(dateEnd, 2) ?? Math.max(...rows.map((row) => chartTime(row.merge_commit_date)));
+    const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
 
     const tooltip = (params) => {
       const row = params?.data?.row;

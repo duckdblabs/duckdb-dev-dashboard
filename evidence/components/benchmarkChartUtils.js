@@ -12,6 +12,22 @@ export const chartTime = (value) => chartDate(value).getTime();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export const chartDateBounds = (rows = [], dateStart, dateEnd) => {
+  const bound = (value, extraDays = 0) => {
+    if (value === null || value === undefined || value === '') return undefined;
+    const date = chartDate(value);
+    if (!Number.isFinite(date.getTime())) return undefined;
+    date.setDate(date.getDate() + extraDays);
+    return date.getTime();
+  };
+  const times = rows.map((row) => chartTime(row.merge_commit_date)).filter(Number.isFinite);
+  // Match the pages' inclusive end-date workaround and keep baseline-only charts finite
+  // while the date controls load.
+  const end = bound(dateEnd, 2) ?? (times.length ? Math.max(...times) : Date.now());
+  const start = bound(dateStart) ?? (times.length ? Math.min(...times) : end - 90 * DAY_MS);
+  return { min: start, max: Math.max(end, start + DAY_MS) };
+};
+
 export const dateAxisInterval = (min, max, splitCount = 10) => {
   const span = Number(max) - Number(min);
   if (!Number.isFinite(span) || span <= 0 || !Number.isFinite(splitCount) || splitCount <= 0) {

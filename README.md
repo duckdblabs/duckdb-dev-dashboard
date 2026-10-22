@@ -63,8 +63,9 @@ SELECT benchmark, benchmark_name, scale_factor, count(*) FROM runs WHERE NOT is_
 ```
 
 The benchmark pages keep the v2.0 and v2.1 development histories selectable independently.
-Fixed release references compare them with v1.4.5, v1.5.5 and v2.0.0 in both the charts and
-per-query timing tables. A reference appears only when matching results exist for that storage
+Charts use the newest patch from each of the two newest minor release lines. Per-query timing
+tables keep fixed references to v1.4.5, v1.5.5 and v2.0.0.
+A reference appears only when matching results exist for that storage
 backend and platform, so v2.0.0 will also appear for DuckLake once it has been benchmarked there.
 The query history's “Slower than” filter uses the newest available release reference.
 
@@ -72,6 +73,13 @@ Overview charts and query-history dropdowns discover suites per storage backend 
 H2O.ai's fixed 1-billion-row dataset appears as `H2O.ai (1 billion rows)` once results arrive.
 Shared names and display order live in `evidence/sources/benchmarks/benchmark_series_list.sql`;
 unrecognised suites use their recorded name. Query-history links accept any discovered suite.
+Suites with only release measurements still show baseline charts on the selected platform,
+including per-query baselines in query history. Incomplete release measurements show their
+successful and attempted query counts. Once development runs appear, baselines must match
+their query set.
+
+The Python DuckDB dependency is pinned to 1.5.6 because Evidence's bundled reader cannot read
+the database format produced by DuckDB 2.0.0.
 
 To check the benchmark queries without lake credentials, install `requirements.txt` and run
 `python3 -m unittest discover -s tests`. Front-end unit tests run with
