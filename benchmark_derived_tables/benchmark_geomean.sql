@@ -95,6 +95,9 @@ select
     -- run currently in the lake. The page filters on this label instead: a NULL would be dropped
     -- by an IN filter, which would silently empty the whole dashboard.
     coalesce(r.machine_type, 'unspecified') as machine_label,
+    -- the AWS account the machine ran in; the same instance type can time a few percent apart in
+    -- two accounts, so the charts mark where a new one starts. NULL before the harness recorded it.
+    r.aws_account_id,
     r.threads,
     r.memory_limit,
     r.storage_type,

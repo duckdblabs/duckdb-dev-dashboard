@@ -186,3 +186,42 @@ export const commitLinks = (row, previousCommitSha) => {
 export const formatSeconds = (value) => Number.isFinite(Number(value))
   ? Number(value).toFixed(3)
   : 'Unknown';
+
+// The same instance type can time a few percent apart in another AWS account, so a chart marks
+// where each later account's runs first appear, by merge date like every point. Runs without a
+// recorded account are left out rather than counted as a change.
+export const accountChanges = (rows = []) => {
+  const firstSeen = new Map();
+  [...rows]
+    .filter((row) => row?.aws_account_id && Number.isFinite(chartTime(row.merge_commit_date)))
+    .sort((a, b) => chartTime(a.merge_commit_date) - chartTime(b.merge_commit_date))
+    .forEach((row) => {
+      if (!firstSeen.has(row.aws_account_id)) {
+        firstSeen.set(row.aws_account_id, chartTime(row.merge_commit_date));
+      }
+    });
+  return [...firstSeen.entries()].slice(1).map(([account, time]) => ({ account, time }));
+};
+
+const ACCOUNT_LINE_COLOR = '#6b7280';
+
+// One thin dotted line per change, drawn by a series with no points of its own so the legend
+// and the data series stay as they are.
+export const accountChangeSeries = (changes) => changes.length === 0 ? [] : [{
+  name: 'AWS account change',
+  type: 'line',
+  data: [],
+  markLine: {
+    symbol: 'none',
+    lineStyle: { type: 'dotted', width: 1, color: ACCOUNT_LINE_COLOR },
+    // a short label at the top, so the line does not read as a gridline
+    label: { show: true, formatter: 'new AWS account', position: 'end', distance: 4, fontSize: 9, color: ACCOUNT_LINE_COLOR },
+    emphasis: { lineStyle: { width: 1 } },
+    data: changes.map((change) => ({ xAxis: change.time, name: change.account }))
+  }
+}];
+
+export const accountChangeTooltip = (params) => params?.componentType === 'markLine'
+  ? `<strong>AWS account change</strong><br>Runs from account ${escapeHtml(params.name ?? 'unknown')} start here.<br>`
+    + 'The same instance type can time a few percent apart in another account,<br>so a step at this line may not be DuckDB.'
+  : null;

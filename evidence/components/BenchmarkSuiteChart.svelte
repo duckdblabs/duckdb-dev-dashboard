@@ -6,6 +6,9 @@
   import { ECharts } from '@evidence-dev/core-components';
   import BenchmarkQueryLink from './BenchmarkQueryLink.svelte';
   import {
+    accountChanges,
+    accountChangeSeries,
+    accountChangeTooltip,
     baselineColor,
     chartDateBounds,
     chartTime,
@@ -52,8 +55,11 @@
     // as readable as the regular interval ticks below it.
     const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
+    const changes = accountChanges(rows);
 
     const tooltip = (params) => {
+      const accountTip = accountChangeTooltip(params);
+      if (accountTip) return accountTip;
       const row = params?.data?.row;
       if (!row) return '';
       const previousCommitSha = previousCommitBySha.get(row.commit_sha);
@@ -62,7 +68,8 @@
         `<strong>Merged ${mergedAt}</strong>`,
         `version: ${escapeHtml(row.duckdb_version ?? 'Unknown')}`,
         `geomean (sec): ${formatSeconds(row.geomean_seconds)}`,
-        `commit: ${commitLinks(row, previousCommitSha)}`
+        `commit: ${commitLinks(row, previousCommitSha)}`,
+        ...(row.aws_account_id ? [`account: ${escapeHtml(row.aws_account_id)}`] : [])
       ];
 
       if (!isComplete(row)) {
@@ -114,7 +121,8 @@
 
     return {
       animation: false,
-      grid: { left: 44, right: 56, top: 16, bottom: 8 },
+      // room for the account change label above the plot, only where there is one
+      grid: { left: 44, right: 56, top: changes.length ? 28 : 16, bottom: 8 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
@@ -154,7 +162,7 @@
         nameGap: 36,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
-      series: [...runSeries, ...baselineSeries]
+      series: [...runSeries, ...baselineSeries, ...accountChangeSeries(changes)]
     };
   };
 

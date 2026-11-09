@@ -5,6 +5,9 @@
 <script>
   import { ECharts } from '@evidence-dev/core-components';
   import {
+    accountChanges,
+    accountChangeSeries,
+    accountChangeTooltip,
     baselineColor,
     chartDateBounds,
     chartTime,
@@ -43,8 +46,11 @@
     const yUnit = timingUnit(values);
     const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
+    const changes = accountChanges(rows);
 
     const tooltip = (params) => {
+      const accountTip = accountChangeTooltip(params);
+      if (accountTip) return accountTip;
       const row = params?.data?.row;
       if (!row) return '';
       const previousCommitSha = previousCommitBySha.get(row.commit_sha);
@@ -54,10 +60,10 @@
 
       if (params.seriesName === 'failed') {
         const error = row.error ? `<br>error: ${escapeHtml(row.error)}` : '';
-        return `<strong>Merged ${mergedAt}</strong><br><span style="color:#ef4444;font-weight:600;">failed — excluded from geomean</span><br>version: ${version}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}${error}`;
+        return `<strong>Merged ${mergedAt}</strong><br><span style="color:#ef4444;font-weight:600;">failed — excluded from geomean</span><br>version: ${version}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}${row.aws_account_id ? `<br>account: ${escapeHtml(row.aws_account_id)}` : ''}${error}`;
       }
 
-      return `<strong>Merged ${mergedAt}</strong><br>version: ${version}<br>mean (sec): ${formatSeconds(row.mean_seconds)}<br>median (sec): ${formatSeconds(row.median_seconds)}<br>range (sec): ${formatSeconds(row.fastest_seconds)}–${formatSeconds(row.slowest_seconds)}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}`;
+      return `<strong>Merged ${mergedAt}</strong><br>version: ${version}<br>mean (sec): ${formatSeconds(row.mean_seconds)}<br>median (sec): ${formatSeconds(row.median_seconds)}<br>range (sec): ${formatSeconds(row.fastest_seconds)}–${formatSeconds(row.slowest_seconds)}<br>commit: ${commitLinks(row, previousCommitSha)}<br>query set: ${querySet}${row.aws_account_id ? `<br>account: ${escapeHtml(row.aws_account_id)}` : ''}`;
     };
 
     // One series per release line, so main and the maintenance branch are separate colours.
@@ -102,7 +108,8 @@
 
     return {
       animation: false,
-      grid: { left: 40, right: 52, top: 12, bottom: 8 },
+      // room for the account change label above the plot, only where there is one
+      grid: { left: 40, right: 52, top: changes.length ? 24 : 12, bottom: 8 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
@@ -154,7 +161,8 @@
           clip: false,
           z: 4
         },
-        ...baselineSeries
+        ...baselineSeries,
+        ...accountChangeSeries(changes)
       ]
     };
   };
