@@ -118,6 +118,7 @@ test('the marker is a single point-less series with a dotted line and a tooltip'
   assert.deepEqual(series.data, []);
   assert.deepEqual(series.markLine.data, [{ xAxis: 1, name: '967110673733' }]);
   assert.equal(series.markLine.lineStyle.type, 'dotted');
+  assert.equal(series.markLine.label.formatter, 'new AWS account');
   assert.match(accountChangeTooltip({ componentType: 'markLine', name: '967110673733' }), /967110673733/);
   assert.equal(accountChangeTooltip({ componentType: 'series' }), null);
 });

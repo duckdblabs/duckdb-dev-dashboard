@@ -203,7 +203,7 @@ export const accountChanges = (rows = []) => {
   return [...firstSeen.entries()].slice(1).map(([account, time]) => ({ account, time }));
 };
 
-const ACCOUNT_LINE_COLOR = '#9ca3af';
+const ACCOUNT_LINE_COLOR = '#6b7280';
 
 // One thin dotted line per change, drawn by a series with no points of its own so the legend
 // and the data series stay as they are.
@@ -214,8 +214,9 @@ export const accountChangeSeries = (changes) => changes.length === 0 ? [] : [{
   markLine: {
     symbol: 'none',
     lineStyle: { type: 'dotted', width: 1, color: ACCOUNT_LINE_COLOR },
-    label: { show: false },
-    emphasis: { label: { show: false }, lineStyle: { width: 1 } },
+    // a short label at the top, so the line does not read as a gridline
+    label: { show: true, formatter: 'new AWS account', position: 'insideEndTop', fontSize: 9, color: ACCOUNT_LINE_COLOR },
+    emphasis: { lineStyle: { width: 1 } },
     data: changes.map((change) => ({ xAxis: change.time, name: change.account }))
   }
 }];
