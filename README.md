@@ -68,6 +68,10 @@ tables keep fixed references to v1.4.5, v1.5.5 and v2.0.0.
 A reference appears only when matching results exist for that storage
 backend and platform, so v2.0.0 will also appear for DuckLake once it has been benchmarked there.
 The query history's “Slower than” filter uses the newest available release reference.
+Charts draw a thin dotted vertical line where runs from a new AWS account first appear (by merge
+date, like the points), and every point's tooltip names its account. The same instance type can time
+a few percent apart in another account, so a step at that line may not be DuckDB. Runs from before
+the harness recorded `aws_account_id` are left out of this.
 
 Overview charts and query-history dropdowns discover suites per storage backend from the results.
 H2O.ai's fixed 1-billion-row dataset appears as `H2O.ai (1 billion rows)` once results arrive.

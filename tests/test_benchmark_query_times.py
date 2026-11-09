@@ -20,7 +20,7 @@ class BenchmarkQueryTimesTest(unittest.TestCase):
                 benchmark varchar, benchmark_name varchar, storage_type varchar,
                 scale_factor double, cpu_arch varchar, machine_type varchar, os varchar,
                 duckdb_version varchar, duckdb_commit_sha varchar, queries_sha varchar,
-                is_test boolean
+                is_test boolean, aws_account_id varchar
             );
             create table query_results (
                 run_id varchar, query varchar, status varchar, verified boolean,
@@ -41,7 +41,7 @@ class BenchmarkQueryTimesTest(unittest.TestCase):
             insert into runs values (
                 ?, '2026-09-22', '2026-09-18', 'tpcds', 'TPC-DS', 'ducklake',
                 100, 'arm64', 'c7gd.4xlarge', 'linux', 'v2.0.0-alpha42526',
-                'same-commit', 'same-query-set', ?
+                'same-commit', 'same-query-set', ?, '967110673733'
             )
         """, [run_id, is_test])
         for query, status in queries:

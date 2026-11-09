@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  accountChanges,
+  accountChangeSeries,
+  accountChangeTooltip,
   baselineColor,
   chartDateBounds,
   dateAxisInterval,
@@ -87,4 +90,34 @@ test('release baseline selection uses numeric versions and excludes prereleases'
 test('patch releases keep the colour of their minor release line', () => {
   assert.equal(baselineColor('v2.0.1'), baselineColor('v2.0.0'));
   assert.notEqual(baselineColor('v2.1.0'), baselineColor('v2.0.1'));
+});
+
+const run = (merged, account) => ({ merge_commit_date: merged, aws_account_id: account });
+
+test('an account change is marked once, where the new account first appears by merge date', () => {
+  const rows = [
+    run('2026-10-28 10:00', '847122343688'),
+    // a backfilled run: measured later, but its commit was merged before the next one
+    run('2026-10-30 09:00', '967110673733'),
+    run('2026-11-08 12:00', '847122343688'),
+    run('2026-11-09 12:00', '967110673733')
+  ];
+  assert.deepEqual(accountChanges(rows), [
+    { account: '967110673733', time: new Date('2026-10-30T09:00').getTime() }
+  ]);
+});
+
+test('runs without a recorded account do not count as a change', () => {
+  const rows = [run('2026-08-20 10:00', null), run('2026-09-10 10:00', '847122343688')];
+  assert.deepEqual(accountChanges(rows), []);
+  assert.deepEqual(accountChangeSeries([]), []);
+});
+
+test('the marker is a single point-less series with a dotted line and a tooltip', () => {
+  const [series] = accountChangeSeries([{ account: '967110673733', time: 1 }]);
+  assert.deepEqual(series.data, []);
+  assert.deepEqual(series.markLine.data, [{ xAxis: 1, name: '967110673733' }]);
+  assert.equal(series.markLine.lineStyle.type, 'dotted');
+  assert.match(accountChangeTooltip({ componentType: 'markLine', name: '967110673733' }), /967110673733/);
+  assert.equal(accountChangeTooltip({ componentType: 'series' }), null);
 });

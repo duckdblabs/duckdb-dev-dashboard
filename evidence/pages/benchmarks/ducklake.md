@@ -92,6 +92,7 @@ select
   p.platform_label as platform,
   r.machine_label,
   r.cpu_arch_label,
+  r.aws_account_id,
   r.queries_ok,
   r.queries_attempted,
   r.queries_failed,

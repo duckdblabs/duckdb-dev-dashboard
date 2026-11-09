@@ -6,6 +6,9 @@
   import { ECharts } from '@evidence-dev/core-components';
   import BenchmarkQueryLink from './BenchmarkQueryLink.svelte';
   import {
+    accountChanges,
+    accountChangeSeries,
+    accountChangeTooltip,
     baselineColor,
     chartDateBounds,
     chartTime,
@@ -54,6 +57,8 @@
     const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
 
     const tooltip = (params) => {
+      const accountTip = accountChangeTooltip(params);
+      if (accountTip) return accountTip;
       const row = params?.data?.row;
       if (!row) return '';
       const previousCommitSha = previousCommitBySha.get(row.commit_sha);
@@ -62,7 +67,8 @@
         `<strong>Merged ${mergedAt}</strong>`,
         `version: ${escapeHtml(row.duckdb_version ?? 'Unknown')}`,
         `geomean (sec): ${formatSeconds(row.geomean_seconds)}`,
-        `commit: ${commitLinks(row, previousCommitSha)}`
+        `commit: ${commitLinks(row, previousCommitSha)}`,
+        ...(row.aws_account_id ? [`account: ${escapeHtml(row.aws_account_id)}`] : [])
       ];
 
       if (!isComplete(row)) {
@@ -154,7 +160,7 @@
         nameGap: 36,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
-      series: [...runSeries, ...baselineSeries]
+      series: [...runSeries, ...baselineSeries, ...accountChangeSeries(accountChanges(rows))]
     };
   };
 
