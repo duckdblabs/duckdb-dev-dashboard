@@ -55,6 +55,7 @@
     // as readable as the regular interval ticks below it.
     const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
+    const changes = accountChanges(rows);
 
     const tooltip = (params) => {
       const accountTip = accountChangeTooltip(params);
@@ -120,7 +121,8 @@
 
     return {
       animation: false,
-      grid: { left: 44, right: 56, top: 16, bottom: 8 },
+      // room for the account change label above the plot, only where there is one
+      grid: { left: 44, right: 56, top: changes.length ? 28 : 16, bottom: 8 },
       legend: lineOrder.length > 1
         ? { show: true, top: 0, right: 56, data: lineOrder }
         : { show: false },
@@ -160,7 +162,7 @@
         nameGap: 36,
         axisLabel: { formatter: (value) => formatTimingTick(value, yUnit) }
       },
-      series: [...runSeries, ...baselineSeries, ...accountChangeSeries(accountChanges(rows))]
+      series: [...runSeries, ...baselineSeries, ...accountChangeSeries(changes)]
     };
   };
 

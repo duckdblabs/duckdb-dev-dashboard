@@ -46,6 +46,7 @@
     const yUnit = timingUnit(values);
     const yMax = niceAxisMax((values.length ? Math.max(...values) : 1) * 1.08);
     const { min: xMin, max: xMax } = chartDateBounds(rows, dateStart, dateEnd);
+    const changes = accountChanges(rows);
 
     const tooltip = (params) => {
       const accountTip = accountChangeTooltip(params);
@@ -107,7 +108,8 @@
 
     return {
       animation: false,
-      grid: { left: 40, right: 52, top: 12, bottom: 8 },
+      // room for the account change label above the plot, only where there is one
+      grid: { left: 40, right: 52, top: changes.length ? 24 : 12, bottom: 8 },
       tooltip: {
         trigger: 'item',
         renderMode: 'html',
@@ -160,7 +162,7 @@
           z: 4
         },
         ...baselineSeries,
-        ...accountChangeSeries(accountChanges(rows))
+        ...accountChangeSeries(changes)
       ]
     };
   };

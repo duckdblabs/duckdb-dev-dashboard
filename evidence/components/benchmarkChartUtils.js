@@ -215,7 +215,7 @@ export const accountChangeSeries = (changes) => changes.length === 0 ? [] : [{
     symbol: 'none',
     lineStyle: { type: 'dotted', width: 1, color: ACCOUNT_LINE_COLOR },
     // a short label at the top, so the line does not read as a gridline
-    label: { show: true, formatter: 'new AWS account', position: 'insideEndTop', fontSize: 9, color: ACCOUNT_LINE_COLOR },
+    label: { show: true, formatter: 'new AWS account', position: 'end', distance: 4, fontSize: 9, color: ACCOUNT_LINE_COLOR },
     emphasis: { lineStyle: { width: 1 } },
     data: changes.map((change) => ({ xAxis: change.time, name: change.account }))
   }
